@@ -9,7 +9,7 @@
   // swaps the content inside them, so a card has to be re-checked when its text changes.
   const lastFp = new WeakMap();
   const seen = C.makeSeen();
-  let opts = { enabled: true, disabled: [], phrases: [], allow: [] };
+  let opts = { enabled: true, mode: 'collapse', disabled: [], phrases: [], allow: [] };
 
   const counter = globalThis.LFBCounters.makeCounter({
     get: (defaults, cb) => chrome.storage.local.get(defaults, cb),
@@ -124,6 +124,30 @@
     if (res.action === 'collapse') stub(el, res);
     else el.setAttribute('title', 'flagged: ' + res.hits.map((h) => h.label).join(', '));
     counter.add(res.hits.map((h) => h.id));
+    flagged++;
+  }
+
+  // Floating pill: how many are hidden, and one click to see them all. The count is the
+  // honest part. If it reads "312 hidden" on a page of 25 jobs, the rules are wrong.
+  let flagged = 0;
+  let pill = null;
+
+  function updatePill() {
+    if (!pill) {
+      pill = document.createElement('button');
+      pill.id = 'lfb-toggle';
+      pill.type = 'button';
+      pill.addEventListener('click', () => {
+        const root = document.documentElement;
+        if (root.hasAttribute('data-lfb-reveal')) root.removeAttribute('data-lfb-reveal');
+        else root.setAttribute('data-lfb-reveal', '');
+        updatePill();
+      });
+      document.body.appendChild(pill);
+    }
+    const revealed = document.documentElement.hasAttribute('data-lfb-reveal');
+    pill.textContent = revealed ? 'hide ' + flagged + ' flagged' : flagged + ' hidden';
+    pill.hidden = flagged === 0;
   }
 
   function scan() {
@@ -134,6 +158,7 @@
 
     const sel = SELECTORS[surface];
     document.querySelectorAll(sel).forEach((el) => process(el, surface, sel));
+    updatePill();
   }
 
   // One trailing scan per burst, over the whole document.
@@ -164,9 +189,10 @@
     }, rescanMs);
   }
 
-  chrome.storage.sync.get({ enabled: true, disabled: [], phrases: [], allow: [] }, (data) => {
+  chrome.storage.sync.get({ enabled: true, mode: 'collapse', disabled: [], phrases: [], allow: [] }, (data) => {
     opts = data;
     if (opts.enabled === false) return;
+    document.documentElement.setAttribute('data-lfb-mode', opts.mode);
     scan();
     // childList only, and the records are not even read: any mutation just means "scan
     // again soon". Reading them was pure cost, since the scan covers the document anyway.

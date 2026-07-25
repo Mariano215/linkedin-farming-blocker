@@ -138,6 +138,18 @@ test('fix: urgency copy is not mistaken for a negation', () => {
   assert.equal(evaluate(ctx('Never repost this for reach.'), 'feed', {}), null);
 });
 
+test('fix: an ordinary job card is not dimmed for lacking a company link', () => {
+  // LinkedIn prints the company as plain text on job cards, so companyUrl is null on
+  // almost all of them. The old no-company-page rule therefore dimmed nearly every
+  // result, which is indistinguishable from the extension being broken.
+  const card = ctx('Senior Backend Engineer\nAcme Corp\nAustin, TX (Remote)\n2 days ago', {
+    title: 'Senior Backend Engineer',
+    company: 'Acme Corp',
+    companyUrl: null
+  });
+  assert.equal(evaluate(card, 'jobs', {}), null);
+});
+
 test("fix: LinkedIn's own shortener is not treated as suspicious", () => {
   // lnkd.in is on a large share of ordinary posts, so matching it dimmed real content.
   assert.equal(evaluate(ctx('I wrote up the migration notes here: https://lnkd.in/abcDEF12'), 'feed', {}), null);

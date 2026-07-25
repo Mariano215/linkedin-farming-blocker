@@ -146,13 +146,10 @@
       // hrefs keep their original case, so lowercase before matching.
       test: (ctx) => ctx.links.some((h) => SHORTENER.test(String(h).toLowerCase())) || SHORTENER.test(ctx.text)
     },
-    {
-      id: 'no-company-page',
-      label: 'no linked company page',
-      surfaces: ['jobs'],
-      severity: 'weak',
-      test: (ctx) => Boolean(ctx.company) && !ctx.companyUrl
-    },
+    // Removed: 'no-company-page'. LinkedIn's job cards print the company as plain text
+    // rather than a link to its page, so companyUrl was null on almost every card and the
+    // rule dimmed nearly the whole result list. Not fixable at card level, since the
+    // information simply is not in the card.
 
     // ---- cross-card state, counts supplied by the caller ----
     // ponytail: counts accumulate as you scroll, so a farm poster is only caught from

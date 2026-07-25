@@ -34,9 +34,8 @@ Behaviour, and only behaviour.
 
 **Scams:** WhatsApp or Telegram contact with a real handle or number, fees and deposits,
 "no interview" and guaranteed selection, known scam genres (reshipping, mystery shopper,
-crypto payment processing), URL shorteners as the only apply link, free-email recruiter
-addresses, no linked company page, one poster spamming many listings, the same listing
-reposted over and over.
+crypto payment processing), third-party URL shorteners, free-email recruiter addresses,
+one poster spamming many listings, the same listing reposted over and over.
 
 A post collapses on one scam or farming hit, or on two weak hits. A single weak signal
 only dims the post. That threshold exists because single soft signals are where the false
@@ -76,8 +75,14 @@ background worker, no telemetry.
 
 ## Tuning it
 
+A floating button at the bottom right of LinkedIn shows how many items are hidden and
+reveals all of them in one click. If it reads "312 hidden" on a page of 25 jobs, the rules
+are wrong, not the page. That number is the fastest signal that something needs turning off.
+
 Open the extension's options page (`chrome://extensions`, Details, Extension options):
 
+- A master on/off switch, so you never have to uninstall to escape a bad rule
+- What to do with flagged items: collapse to a reason, hide completely, or only grey out
 - A checkbox per rule, so you can switch off one that annoys you
 - Your own phrases, one per line, treated as a farming hit
 - An allowlist of companies, profile URLs, or phrases that must never be hidden
@@ -105,7 +110,7 @@ repository.
 node --test test/*.mjs
 ```
 
-20 tests, no framework, no dependencies. `rules.js`, `cards.js`, and `counters.js` all
+22 tests, no framework, no dependencies. `rules.js`, `cards.js`, and `counters.js` all
 set a global and also export for CommonJS, which is how the same file runs in a content
 script and under node.
 

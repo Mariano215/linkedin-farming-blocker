@@ -1,3 +1,4 @@
+/* Default mode: collapse to a stub that states its reason. */
 [data-lfb-collapse] > *:not(.lfb-stub) {
   display: none !important;
 }
@@ -7,6 +8,32 @@
 [data-lfb-dim] {
   opacity: 0.45;
   filter: grayscale(0.6);
+}
+
+/* mode=hide: flagged items leave the layout entirely, dimmed ones included. */
+:root[data-lfb-mode='hide'] [data-lfb-collapse],
+:root[data-lfb-mode='hide'] [data-lfb-dim] {
+  display: none !important;
+}
+
+/* mode=dim: nothing is hidden, everything flagged is just greyed out. */
+:root[data-lfb-mode='dim'] [data-lfb-collapse] {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
+:root[data-lfb-mode='dim'] [data-lfb-collapse] > *:not(.lfb-stub) {
+  display: revert !important;
+}
+
+/* The on-page toggle wins over every mode, so nothing is ever lost for good. */
+:root[data-lfb-reveal] [data-lfb-collapse],
+:root[data-lfb-reveal] [data-lfb-dim] {
+  display: revert !important;
+  opacity: 1;
+  filter: none;
+}
+:root[data-lfb-reveal] [data-lfb-collapse] > *:not(.lfb-stub) {
+  display: revert !important;
 }
 
 .lfb-stub {
@@ -35,4 +62,26 @@
   border: 1px solid currentColor;
   border-radius: 10px;
   cursor: pointer;
+}
+
+/* Floating count and reveal toggle. */
+#lfb-toggle {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483000;
+  padding: 7px 13px;
+  font: 500 12px/1.3 -apple-system, system-ui, sans-serif;
+  color: #fff;
+  background: #2c2c2c;
+  border: 0;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 30%);
+  cursor: pointer;
+}
+#lfb-toggle:hover {
+  background: #000;
+}
+#lfb-toggle[hidden] {
+  display: none;
 }

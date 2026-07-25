@@ -3,8 +3,9 @@
   const { rules } = globalThis.LFB;
   const box = document.getElementById('rules');
 
-  chrome.storage.sync.get({ enabled: true, disabled: [], phrases: [], allow: [] }, (data) => {
+  chrome.storage.sync.get({ enabled: true, mode: 'collapse', disabled: [], phrases: [], allow: [] }, (data) => {
     document.getElementById('enabled').checked = data.enabled !== false;
+    document.getElementById('mode').value = data.mode;
     for (const r of rules) {
       const label = document.createElement('label');
       const cb = document.createElement('input');
@@ -32,7 +33,8 @@
   document.getElementById('save').addEventListener('click', () => {
     const disabled = Array.from(box.querySelectorAll('input:not(:checked)')).map((c) => c.value);
     const enabled = document.getElementById('enabled').checked;
-    chrome.storage.sync.set({ enabled, disabled, phrases: lines('phrases'), allow: lines('allow') }, () => {
+    const mode = document.getElementById('mode').value;
+    chrome.storage.sync.set({ enabled, mode, disabled, phrases: lines('phrases'), allow: lines('allow') }, () => {
       const el = document.getElementById('saved');
       el.textContent = 'saved, reload LinkedIn';
       setTimeout(() => (el.textContent = ''), 3000);

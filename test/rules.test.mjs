@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import '../rules.js'; // plain script, sets globalThis.LFB
 
-const { evaluate, emptySeen } = globalThis.LFB;
+const { evaluate } = globalThis.LFB;
 
 function ctx(raw, extra = {}) {
   return {
@@ -13,9 +13,8 @@ function ctx(raw, extra = {}) {
     company: null,
     companyUrl: null,
     posterUrl: null,
-    posterKey: null,
-    dupeKey: null,
-    seen: emptySeen(),
+    posterCount: 0,
+    dupeCount: 0,
     ...extra
   };
 }
@@ -55,12 +54,10 @@ test('one weak signal only dims, two collapse', () => {
 });
 
 test('cross-card rules fire only past the threshold', () => {
-  const seen = emptySeen();
-  seen.posters.set('/in/recruiter-x', 8);
-  assert.ok(hitIds('Java Developer, Austin TX', 'jobs', { seen, posterKey: '/in/recruiter-x' }).includes('spam-poster'));
-
-  seen.posters.set('/in/recruiter-y', 3);
-  assert.ok(!hitIds('Java Developer, Austin TX', 'jobs', { seen, posterKey: '/in/recruiter-y' }).includes('spam-poster'));
+  assert.ok(hitIds('Java Developer, Austin TX', 'jobs', { posterCount: 8 }).includes('spam-poster'));
+  assert.ok(!hitIds('Java Developer, Austin TX', 'jobs', { posterCount: 3 }).includes('spam-poster'));
+  assert.ok(hitIds('Java Developer, Austin TX', 'jobs', { dupeCount: 4 }).includes('dupe-listing'));
+  assert.ok(!hitIds('Java Developer, Austin TX', 'jobs', { dupeCount: 2 }).includes('dupe-listing'));
 });
 
 test('legitimate posts are not flagged', () => {
@@ -91,4 +88,60 @@ test('rule toggles and user phrases work', () => {
   const res = evaluate(ctx('Commission only, uncapped'), 'feed', { phrases: ['commission only'] });
   assert.equal(res.action, 'collapse');
   assert.equal(res.hits[0].id, 'user-phrase');
+});
+
+// ---- regressions found in review ----
+
+test('fix: naming an app without a handle is not off-platform contact', () => {
+  // "Signal" plus a nearby word used to collapse this as a scam.
+  assert.equal(evaluate(ctx('Our engineering org uses Signal now for incident coordination.'), 'feed', {}), null);
+  assert.equal(evaluate(ctx('We moved internal comms to Telegram and Slack last quarter.'), 'feed', {}), null);
+  // still catches the real thing
+  assert.ok(hitIds('WhatsApp me for the JD', 'jobs').includes('offplatform-contact'));
+  assert.ok(hitIds('Contact us on Telegram to proceed', 'jobs').includes('offplatform-contact'));
+  assert.ok(hitIds('Reach me on Signal for next steps', 'jobs').includes('offplatform-contact'));
+  assert.ok(hitIds('Ping here: https://t.me/hiringfast', 'jobs').includes('offplatform-contact'));
+});
+
+test('fix: posts warning about these patterns are not flagged', () => {
+  const warnings = [
+    ['Please do not comment INTERESTED on random job posts, apply on the company site.', 'feed'],
+    ['Do not send me a DM about this role, apply through our careers page.', 'feed'],
+    ['Red flag: they asked me to pay a registration fee of $200. Report these.', 'feed'],
+    ['Never repost this for reach, it only helps the farmer.', 'feed'],
+    ['Beware of anyone telling you to WhatsApp me for the JD, that is a scam.', 'feed']
+  ];
+  for (const [raw, surface] of warnings) {
+    assert.equal(evaluate(ctx(raw), surface, {}), null, 'should not flag warning: ' + raw);
+  }
+  // the guard is scoped: "no interview" keeps firing, since "no" is the signal itself
+  assert.ok(hitIds('Direct joining with no interview required.', 'jobs').includes('no-interview'));
+});
+
+test('fix: previously missed phrasings now match', () => {
+  assert.ok(hitIds('Hiring backend engineers. Comment below for link.', 'feed').includes('comment-gate'));
+  // hrefs keep their original case
+  assert.ok(hitIds('Apply here', 'jobs', { links: ['https://BIT.LY/xy12ab'] }).includes('link-shortener'));
+  assert.ok(hitIds('To start onboarding, pay 250 USD today.', 'jobs').includes('pay-to-apply'));
+  assert.ok(hitIds('Pay 5000 INR for the training kit.', 'jobs').includes('pay-to-apply'));
+});
+
+test('fix: urgency copy is not mistaken for a negation', () => {
+  // The negation guard used to swallow these, which is worse than the bug it fixed:
+  // a farming post only has to open with "Don't miss this" to become invisible.
+  assert.ok(hitIds("Don't miss this role, comment interested for the link.", 'feed').includes('comment-gate'));
+  assert.ok(hitIds('No need to apply on site, comment interested for the link.', 'feed').includes('comment-gate'));
+  assert.ok(hitIds("Don't wait! DM me for the link before it closes.", 'feed').includes('dm-gate'));
+
+  // and the real warnings still stay visible
+  assert.equal(evaluate(ctx('Please do not comment interested on random job posts.'), 'feed', {}), null);
+  assert.equal(evaluate(ctx('Never repost this for reach.'), 'feed', {}), null);
+});
+
+test("fix: LinkedIn's own shortener is not treated as suspicious", () => {
+  // lnkd.in is on a large share of ordinary posts, so matching it dimmed real content.
+  assert.equal(evaluate(ctx('I wrote up the migration notes here: https://lnkd.in/abcDEF12'), 'feed', {}), null);
+  assert.equal(evaluate(ctx('Notes attached', { links: ['https://lnkd.in/abcDEF12'] }), 'feed', {}), null);
+  // third-party shorteners still count
+  assert.ok(hitIds('Apply: cutt.ly/abc123', 'jobs').includes('link-shortener'));
 });

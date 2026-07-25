@@ -1,13 +1,20 @@
-// DOM side: find cards, build ctx, apply the verdict, watch for new nodes.
+// DOM side: find cards, build ctx, apply the verdict, watch for new and recycled nodes.
 (function () {
   'use strict';
 
   const LFB = globalThis.LFB;
-  const done = new WeakSet();
-  const seen = LFB.emptySeen();
+  const C = globalThis.LFBCards;
+
+  // Fingerprint per card, not a WeakSet of "seen" nodes: LinkedIn recycles cards and
+  // swaps the content inside them, so a card has to be re-checked when its text changes.
+  const lastFp = new WeakMap();
+  const seen = C.makeSeen();
   let opts = { disabled: [], phrases: [], allow: [] };
-  const counts = Object.create(null);
-  let flushTimer = null;
+
+  const counter = globalThis.LFBCounters.makeCounter({
+    get: (defaults, cb) => chrome.storage.local.get(defaults, cb),
+    set: (obj, cb) => chrome.storage.local.set(obj, () => cb(chrome.runtime.lastError || null))
+  });
 
   const SELECTORS = {
     jobs: '[data-job-id], [data-occludable-job-id], li.jobs-search-results__list-item, .job-card-container',
@@ -22,12 +29,16 @@
     return null;
   }
 
-  function norm(s) {
-    return s.replace(/\s+/g, ' ').trim();
+  function clearVerdict(el) {
+    el.removeAttribute('data-lfb-collapse');
+    el.removeAttribute('data-lfb-dim');
+    el.removeAttribute('data-lfb-show');
+    el.removeAttribute('title');
+    const stub = el.querySelector(':scope > .lfb-stub');
+    if (stub) stub.remove();
   }
 
-  function buildCtx(el, surface) {
-    const raw = norm(el.innerText || el.textContent || '');
+  function buildCtx(el, surface, fp) {
     const links = Array.from(el.querySelectorAll('a[href]')).map((a) => a.getAttribute('href') || '');
     const companyLink = links.find((h) => h.includes('/company/'));
     const posterLink = links.find((h) => h.includes('/in/') || h.includes('/company/'));
@@ -35,27 +46,30 @@
       '.job-card-list__title, .job-card-container__link, [class*="job-card"] strong, .update-components-actor__title'
     );
     const company =
-      norm(
+      C.norm(
         (el.querySelector('.job-card-container__primary-description, .artdeco-entity-lockup__subtitle') || {})
           .textContent || ''
       ) || null;
 
     const ctx = {
-      raw,
-      text: raw.toLowerCase(),
+      raw: fp,
+      text: fp.toLowerCase(),
       links,
-      title: titleEl ? norm(titleEl.textContent) : null,
+      title: titleEl ? C.norm(titleEl.textContent) : null,
       company,
       companyUrl: companyLink || null,
       posterUrl: posterLink || null,
-      posterKey: posterLink ? posterLink.split('?')[0] : null,
-      dupeKey: null,
-      seen
+      posterCount: 0,
+      dupeCount: 0
     };
-    if (surface === 'jobs' && ctx.title && company) ctx.dupeKey = (ctx.title + '|' + company).toLowerCase();
 
-    if (ctx.posterKey) seen.posters.set(ctx.posterKey, (seen.posters.get(ctx.posterKey) || 0) + 1);
-    if (ctx.dupeKey) seen.listings.set(ctx.dupeKey, (seen.listings.get(ctx.dupeKey) || 0) + 1);
+    if (surface === 'jobs') {
+      const id = C.cardId(el, fp);
+      const posterKey = posterLink ? posterLink.split('?')[0].toLowerCase() : null;
+      const dupeKey = ctx.title && company ? (ctx.title + '|' + company).toLowerCase() : null;
+      ctx.posterCount = C.bump(seen.posters, posterKey, id) || C.countOf(seen.posters, posterKey);
+      ctx.dupeCount = C.bump(seen.listings, dupeKey, id) || C.countOf(seen.listings, dupeKey);
+    }
     return ctx;
   }
 
@@ -65,7 +79,7 @@
       return (
         (ctx.company && ctx.company.toLowerCase().includes(needle)) ||
         (ctx.posterUrl && ctx.posterUrl.toLowerCase().includes(needle)) ||
-        (ctx.text && needle.length > 3 && ctx.text.includes(needle))
+        (needle.length > 3 && ctx.text.includes(needle))
       );
     });
   }
@@ -74,8 +88,7 @@
     const bar = document.createElement('div');
     bar.className = 'lfb-stub';
     bar.dataset.lfbSeverity = res.severity;
-    const reason = res.hits.map((h) => h.label).join(', ');
-    bar.textContent = 'hidden: ' + reason;
+    bar.textContent = 'hidden: ' + res.hits.map((h) => h.label).join(', ');
     const show = document.createElement('button');
     show.type = 'button';
     show.className = 'lfb-show';
@@ -92,53 +105,50 @@
     el.insertBefore(bar, el.firstChild);
   }
 
-  function tally(res) {
-    for (const h of res.hits) counts[h.id] = (counts[h.id] || 0) + 1;
-    if (flushTimer) return;
-    flushTimer = setTimeout(() => {
-      flushTimer = null;
-      chrome.storage.local.get({ counts: {} }, (data) => {
-        const merged = data.counts || {};
-        for (const k in counts) merged[k] = (merged[k] || 0) + counts[k];
-        for (const k in counts) delete counts[k];
-        chrome.storage.local.set({ counts: merged });
-      });
-    }, 5000);
-  }
-
   function process(el, surface) {
-    if (done.has(el)) return;
-    done.add(el);
-    const ctx = buildCtx(el, surface);
-    if (!ctx.text || allowed(ctx)) return;
+    const fp = C.fingerprint(el);
+    if (!fp || lastFp.get(el) === fp) return;
+    lastFp.set(el, fp);
+    clearVerdict(el);
+
+    const ctx = buildCtx(el, surface, fp);
+    if (allowed(ctx)) return;
     const res = LFB.evaluate(ctx, surface, opts);
     if (!res) return;
     el.setAttribute('data-lfb-' + res.action, res.severity);
     if (res.action === 'collapse') stub(el, res);
     else el.setAttribute('title', 'flagged: ' + res.hits.map((h) => h.label).join(', '));
-    tally(res);
+    counter.add(res.hits.map((h) => h.id));
   }
 
-  function scan(root) {
+  function scan(node) {
     const surface = surfaceOf(location.pathname);
     if (!surface) return;
+    C.syncPage(seen, location.pathname + location.search);
+
     const sel = SELECTORS[surface];
-    const scope = root && root.querySelectorAll ? root : document;
-    if (scope !== document && scope.matches && scope.matches(sel)) process(scope, surface);
+    if (node && node !== document && node.closest) {
+      // A mutation often only adds a descendant, so climb to the card that owns it.
+      const own = node.closest(sel);
+      if (own) process(own, surface);
+    }
+    const scope = node && node.querySelectorAll ? node : document;
     scope.querySelectorAll(sel).forEach((el) => process(el, surface));
   }
 
   const idle = globalThis.requestIdleCallback || ((fn) => setTimeout(fn, 150));
-  let pending = [];
+  // A Set, not an array: one card being retyped fires hundreds of characterData
+  // mutations on the same parent, and scanning it once per batch is enough.
+  let pending = new Set();
   let queued = false;
   function schedule(nodes) {
-    pending.push(...nodes);
+    for (const n of nodes) pending.add(n);
     if (queued) return;
     queued = true;
     idle(() => {
       queued = false;
       const batch = pending;
-      pending = [];
+      pending = new Set();
       batch.forEach(scan);
     });
   }
@@ -147,11 +157,13 @@
     opts = data;
     scan(document);
     new MutationObserver((muts) => {
-      const added = [];
+      const touched = [];
       for (const m of muts) {
-        for (const n of m.addedNodes) if (n.nodeType === 1) added.push(n);
+        for (const n of m.addedNodes) if (n.nodeType === 1) touched.push(n);
+        // Text swapped inside a recycled card: re-check the card that owns the target.
+        if (m.type === 'characterData' && m.target.parentElement) touched.push(m.target.parentElement);
       }
-      if (added.length) schedule(added);
-    }).observe(document.body, { childList: true, subtree: true });
+      if (touched.length) schedule(touched);
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
   });
 })();

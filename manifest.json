@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "LinkedIn Farming & Scam Blocker",
+  "version": "0.1.0",
+  "description": "Collapses engagement-farming posts and scam job listings on LinkedIn, with the reason shown so you can tune the rules.",
+  "permissions": ["storage"],
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["rules.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+[data-lfb-collapse] > *:not(.lfb-stub) {
+  display: none !important;
+}
+[data-lfb-collapse][data-lfb-show] > *:not(.lfb-stub) {
+  display: revert !important;
+}
+[data-lfb-dim] {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
+
+.lfb-stub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font: 12px/1.4 -apple-system, system-ui, sans-serif;
+  color: #5b5b5b;
+  background: #f3f2ef;
+  border-left: 3px solid #8c8c8c;
+  border-radius: 4px;
+}
+.lfb-stub[data-lfb-severity='scam'] {
+  color: #8c1c13;
+  background: #fdf1f0;
+  border-left-color: #b42318;
+}
+
+.lfb-show {
+  margin-left: auto;
+  padding: 1px 8px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  cursor: pointer;
+}

@@ -1,0 +1,51 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Unit tests
+        run: node --test test/*.mjs
+
+      # The extension has no build step, so a syntax error would ship straight to users.
+      - name: Syntax check every file Chrome loads
+        run: for f in cards.js counters.js rules.js learn.js content.js options.js; do node --check "$f"; done
+
+      - name: Manifest is valid JSON and lists the files that exist
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, sys
+          m = json.load(open('manifest.json'))
+          missing = []
+          for js in m['content_scripts'][0]['js']:
+              if not pathlib.Path(js).exists(): missing.append(js)
+          for css in m['content_scripts'][0].get('css', []):
+              if not pathlib.Path(css).exists(): missing.append(css)
+          for icon in m.get('icons', {}).values():
+              if not pathlib.Path(icon).exists(): missing.append(icon)
+          if not pathlib.Path(m['options_page']).exists(): missing.append(m['options_page'])
+          if missing:
+              sys.exit('manifest references missing files: ' + ', '.join(missing))
+          print('manifest ok,', len(m['content_scripts'][0]['js']), 'scripts')
+          PY
+
+      # PRIVACY.md promises no network calls. Enforce the promise rather than trust it.
+      - name: No network calls in shipped code
+        run: |
+          if grep -rnE "fetch\(|XMLHttpRequest|WebSocket|sendBeacon" *.js; then
+            echo "Found a network primitive. PRIVACY.md says there are none."
+            exit 1
+          fi
+          echo "no network primitives"

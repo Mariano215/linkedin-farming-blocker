@@ -139,6 +139,12 @@
 #lfb-toggle:hover {
   background: #000;
 }
+#lfb-toggle[data-state='warn'] {
+  background: #b48a18;
+}
+#lfb-toggle[data-state='warn']:hover {
+  background: #8a6a10;
+}
 #lfb-toggle[hidden] {
   display: none;
 }

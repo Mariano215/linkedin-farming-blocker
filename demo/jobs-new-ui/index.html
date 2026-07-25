@@ -127,6 +127,9 @@
           out.push('cards below the divider: ' + below + ' (want 2)');
           out.push('detail pane NOT a card: ' + (document.getElementById('detail-pane').hasAttribute('data-lfb-card') ? 'NO (bug)' : 'YES'));
           out.push('no card swallows the detail pane: ' + ([...cards].some(c => c.contains(document.getElementById('detail-pane'))) ? 'NO (runaway walk)' : 'YES'));
+          out.push('open job list card still tagged: ' + (document.querySelector('._x7f2a').hasAttribute('data-lfb-card') ? 'YES' : 'NO (pane header stole it)'));
+          out.push('nothing inside the pane tagged: ' + (document.getElementById('detail-pane').querySelector('[data-lfb-card]') ? 'NO (bug)' : 'YES'));
+          out.push('diag exposed: ' + (typeof __lfbDiag === 'function' && __lfbDiag().cards === 4 ? 'YES' : 'NO'));
 
           // hover + mark on a card below the divider
           const target = document.querySelectorAll('section [data-lfb-card]')[1];

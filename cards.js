@@ -93,6 +93,10 @@
     return ids;
   }
 
+  // Below this, an element is a title fragment rather than a card. A real card carries at
+  // least a title plus a company or a preview line.
+  const MIN_CARD_CHARS = 25;
+
   function cardFor(anchorEl, anchor, cap) {
     let el = anchorEl.parentElement;
     let best = null;
@@ -101,7 +105,7 @@
       if (norm(el.textContent).length > cap) break; // reached a layout container
       best = el;
     }
-    return best;
+    return best && norm(best.textContent).length >= MIN_CARD_CHARS ? best : null;
   }
 
   // Union of the structural pass and the legacy selectors, so both the new and the old
@@ -110,28 +114,62 @@
     const cap = CARD_MAX[surface] || MAX_CHARS;
     const byId = new Map();
 
-    for (const anchor of ANCHORS[surface] || []) {
-      for (const a of document.querySelectorAll(anchor.sel)) {
-        const m = anchor.id.exec(a.getAttribute('href') || '');
-        if (!m) continue;
+    // The shape that found more distinct ids goes first: the list shape sees every
+    // listing, the detail-pane shape sees one. First find wins per id. The earlier
+    // smaller-element-wins rule let the pane's little title block replace the open job's
+    // real list card, which made that one card unhoverable and unmarkable.
+    const shapes = (ANCHORS[surface] || [])
+      .map((anchor) => {
+        const hits = [];
+        const distinct = new Set();
+        for (const a of document.querySelectorAll(anchor.sel)) {
+          const m = anchor.id.exec(a.getAttribute('href') || '');
+          if (m) {
+            hits.push([a, m[1]]);
+            distinct.add(m[1]);
+          }
+        }
+        return { anchor, hits, distinct: distinct.size };
+      })
+      .sort((x, y) => y.distinct - x.distinct);
+
+    for (const { anchor, hits } of shapes) {
+      for (const [a, id] of hits) {
+        if (byId.has(id)) continue; // first find wins, within a shape that is DOM order
         const card = cardFor(a, anchor, cap);
-        if (!card) continue;
-        // One listing can be reachable by more than one anchor shape, typically a compact
-        // card in the list and the big detail pane. Keep the smaller: that is the card.
-        const prev = byId.get(m[1]);
-        if (!prev || norm(card.textContent).length < norm(prev.textContent).length) byId.set(m[1], card);
+        if (card) byId.set(id, card);
       }
     }
 
-    const found = new Set(byId.values());
+    const cards = Array.from(new Set(byId.values()));
     if (legacySel) {
       for (const el of document.querySelectorAll(legacySel)) {
-        // Skip a legacy match that merely wraps a card the structural pass already found.
-        if (!Array.from(found).some((f) => el.contains(f) && el !== f)) found.add(el);
+        // Only add a legacy match disjoint from every structural card. A wrapper or an
+        // inner fragment of one would nest cards inside cards.
+        if (!cards.some((f) => f === el || f.contains(el) || el.contains(f))) cards.push(el);
       }
     }
     // Never keep an element that contains another kept element.
-    return Array.from(found).filter((el) => !Array.from(found).some((o) => o !== el && el.contains(o)));
+    return cards.filter((el) => !cards.some((o) => o !== el && el.contains(o)));
+  }
+
+  // Match counts per anchor shape and per legacy selector, for the debug report. This is
+  // what turns "it does nothing" into a one-paste diagnosis.
+  function diag(surface, legacySel) {
+    const shapes = {};
+    for (const a of ANCHORS[surface] || []) shapes[a.sel] = document.querySelectorAll(a.sel).length;
+    const legacy = {};
+    for (const s of String(legacySel || '')
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean)) {
+      try {
+        legacy[s] = document.querySelectorAll(s).length;
+      } catch (_) {
+        legacy[s] = 'invalid selector';
+      }
+    }
+    return { shapes, legacy };
   }
 
   function makeSeen() {
@@ -165,7 +203,7 @@
     return true;
   }
 
-  const api = { norm, fingerprint, cardId, collapsible, findCards, MAX_CHARS, makeSeen, bump, countOf, syncPage };
+  const api = { norm, fingerprint, cardId, collapsible, findCards, diag, MAX_CHARS, makeSeen, bump, countOf, syncPage };
   root.LFBCards = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

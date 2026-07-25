@@ -34,7 +34,7 @@
   });
 
   const SELECTORS = {
-    jobs: '[data-job-id], [data-occludable-job-id], li.jobs-search-results__list-item, .job-card-container',
+    jobs: '[data-job-id], [data-occludable-job-id], li.jobs-search-results__list-item, .job-card-container, [data-view-name*="job-card"]',
     feed: '.feed-shared-update-v2[data-id], [data-urn^="urn:li:activity"], div[data-id^="urn:li:activity"]',
     messaging: 'li.msg-conversations-container__convo-item, .msg-s-event-listitem'
   };
@@ -277,15 +277,16 @@
     });
   }
 
-  function process(el, surface, sel) {
+  function process(el, surface) {
     const fp = C.fingerprint(el);
     if (!fp || lastFp.get(el) === fp) return;
     // Recorded before the collapsible check, not after: containers fail that check on
     // every single scan otherwise, and each failure costs a querySelector.
     lastFp.set(el, fp);
-    // Innermost match only. Guards against hiding a layout container, which blanks out a
-    // whole region of the page.
-    if (!C.collapsible(fp, Boolean(el.querySelector(sel)))) return;
+    // Innermost discovered card only. findCards guarantees no containment between cards,
+    // so this fires only if something slipped through; it guards against hiding a layout
+    // container, which blanks out a whole region of the page.
+    if (!C.collapsible(fp, Boolean(el.querySelector('[data-lfb-card]')))) return;
     clearVerdict(el);
 
     if (markedKeys.has(C.cardId(el, fp))) el.setAttribute('data-lfb-marked', '');
@@ -301,27 +302,74 @@
     flagged++;
   }
 
+  // Everything needed to diagnose "it does nothing" from one paste: which anchor shapes
+  // and selectors matched, how many cards resulted, and whether the context is live.
+  function diagReport() {
+    const surface = surfaceOf(location.pathname);
+    let version = 'dev';
+    try {
+      if (chrome.runtime && chrome.runtime.getManifest) version = chrome.runtime.getManifest().version;
+    } catch (_) {
+      /* invalidated context, 'dev' is accurate enough */
+    }
+    return Object.assign(
+      { version, path: location.pathname, surface },
+      C.diag(surface, SELECTORS[surface] || ''),
+      {
+        cards: document.querySelectorAll('[data-lfb-card]').length,
+        flagged,
+        marked: markedKeys.size,
+        contextAlive: alive()
+      }
+    );
+  }
+  // Reachable from the DevTools console via the extension's context, and from the demo
+  // pages directly.
+  globalThis.__lfbDiag = diagReport;
+
   // Floating pill: how many are hidden, and one click to see them all. The count is the
   // honest part. If it reads "312 hidden" on a page of 25 jobs, the rules are wrong.
+  // When a known surface yields ZERO cards, the pill flips to a warning that copies the
+  // debug report on click, because silence was how every discovery failure so far hid.
   let flagged = 0;
   let pill = null;
 
-  function updatePill() {
+  function updatePill(cardCount) {
     if (!pill) {
       pill = document.createElement('button');
       pill.id = 'lfb-toggle';
       pill.type = 'button';
       pill.addEventListener('click', () => {
+        if (pill.dataset.state === 'warn') {
+          const report = JSON.stringify(diagReport(), null, 2);
+          navigator.clipboard.writeText(report).then(
+            () => toast('Debug report copied. Paste it into the chat.'),
+            () => {
+              console.info('[lfb] debug report\n' + report);
+              toast('Could not copy. The report is printed in the console under [lfb].');
+            }
+          );
+          return;
+        }
         const root = document.documentElement;
         if (root.hasAttribute('data-lfb-reveal')) root.removeAttribute('data-lfb-reveal');
         else root.setAttribute('data-lfb-reveal', '');
-        updatePill();
+        updatePill(cardCount);
       });
       document.body.appendChild(pill);
     }
     const revealed = document.documentElement.hasAttribute('data-lfb-reveal');
-    pill.textContent = revealed ? 'hide ' + flagged + ' flagged' : flagged + ' hidden';
-    pill.hidden = flagged === 0;
+    if (flagged > 0) {
+      pill.dataset.state = 'count';
+      pill.textContent = revealed ? 'hide ' + flagged + ' flagged' : flagged + ' hidden';
+      pill.hidden = false;
+    } else if (cardCount === 0) {
+      pill.dataset.state = 'warn';
+      pill.textContent = 'LFB: 0 job cards found. Click to copy debug info';
+      pill.hidden = false;
+    } else {
+      pill.hidden = true;
+    }
   }
 
   function scan() {
@@ -330,15 +378,12 @@
     if (!surface) return;
     C.syncPage(seen, location.pathname + location.search);
 
-    const sel = SELECTORS[surface];
-    const cards = C.findCards(surface, sel);
-    // Tag what we found, so hover and everything downstream key off our own attribute
-    // rather than re-running LinkedIn-specific selectors that may match nothing.
-    for (const el of cards) {
-      el.setAttribute('data-lfb-card', '');
-      process(el, surface, sel);
-    }
-    updatePill();
+    const cards = C.findCards(surface, SELECTORS[surface]);
+    // Tag everything first, then process: hover and the nested-card guard key off our own
+    // attribute rather than re-running LinkedIn-specific selectors that may match nothing.
+    for (const el of cards) el.setAttribute('data-lfb-card', '');
+    for (const el of cards) process(el, surface);
+    updatePill(cards.length);
   }
 
   // One trailing scan per burst, over the whole document.
@@ -378,15 +423,9 @@
     chrome.storage.local.get({ marked: [] }, (data) => {
       for (const m of data.marked || []) if (m.key) markedKeys.add(m.key);
       scan();
-      // One line, so "is it running and what did it find" is answerable from the console
-      // instead of by guessing across a support round-trip.
-      console.info(
-        '[lfb] active. surface=%s cards=%d flagged=%d path=%s',
-        surfaceOf(location.pathname),
-        document.querySelectorAll('[data-lfb-card]').length,
-        flagged,
-        location.pathname
-      );
+      // The whole state in one expandable object, so "is it running and what did it find"
+      // is answerable from the console instead of by guessing across a support round-trip.
+      console.info('[lfb] active', diagReport());
     });
     // childList only, and the records are not even read: any mutation just means "scan
     // again soon". Reading them was pure cost, since the scan covers the document anyway.

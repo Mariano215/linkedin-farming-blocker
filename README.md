@@ -191,10 +191,15 @@ assertion out.
 
 ## Known limits
 
-LinkedIn rotates DOM class names and A/B tests card markup, so the selectors in
-`content.js` will rot. Matching is text and `data-*`-attribute based to slow that down,
-and every stub states its reason so a broken rule is visible rather than silent. If the
-hit counts stop moving, the selectors need a look.
+LinkedIn rotates DOM class names and A/B tests card markup. Cards are therefore found
+structurally, by walking up from the `/jobs/view/<id>` link a card contains to the
+outermost ancestor whose job links all point at the same listing. A URL shape is a routing
+contract and changes far less often than a class name. The old class-based selectors are
+still tried as well, so both the current and previous markup work.
+
+This is not immune, just harder to break: if LinkedIn changes its job URL shape, discovery
+fails. The symptom is the hover pill never appearing, and `demo/jobs-new-ui/` exists to
+reproduce that class of failure against markup with no recognisable class names at all.
 
 Cross-card rules (one poster spamming, a listing repeated) count as you scroll, so a farm
 poster is caught from the card that crosses the threshold onward, not retroactively.

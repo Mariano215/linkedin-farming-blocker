@@ -167,9 +167,9 @@
       'mouseover',
       (e) => {
         if (opts.marking === false) return;
-        const surface = surfaceOf(location.pathname);
-        const sel = surface ? SELECTORS[surface] : null;
-        const card = sel && e.target.closest ? e.target.closest(sel) : null;
+        // [data-lfb-card] is set by scan() on whatever it discovered, so hovering works on
+        // any markup the discovery pass can reach, not just the markup I named.
+        const card = e.target.closest ? e.target.closest('[data-lfb-card]') : null;
         if (card === hovered) return;
         if (hovered) hovered.removeAttribute('data-lfb-hover');
         hovered = card;
@@ -301,7 +301,13 @@
     C.syncPage(seen, location.pathname + location.search);
 
     const sel = SELECTORS[surface];
-    document.querySelectorAll(sel).forEach((el) => process(el, surface, sel));
+    const cards = C.findCards(surface, sel);
+    // Tag what we found, so hover and everything downstream key off our own attribute
+    // rather than re-running LinkedIn-specific selectors that may match nothing.
+    for (const el of cards) {
+      el.setAttribute('data-lfb-card', '');
+      process(el, surface, sel);
+    }
     updatePill();
   }
 

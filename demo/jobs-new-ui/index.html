@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en" data-lfb-surface="jobs">
+  <head>
+    <meta charset="utf-8" />
+    <title>Demo: new-style markup</title>
+    <link rel="stylesheet" href="../../content.css" />
+    <style>
+      body {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 24px 16px 80px;
+        font: 14px/1.45 -apple-system, system-ui, sans-serif;
+        background: #f4f2ee;
+      }
+      .banner {
+        margin: 0 0 18px;
+        padding: 8px 12px;
+        font-size: 12px;
+        color: #6a4b00;
+        background: #fff4d6;
+        border-left: 3px solid #b48a18;
+      }
+      .sep {
+        margin: 18px 0 10px;
+        font-size: 13px;
+        color: #666;
+      }
+      ._x7f2a {
+        margin: 0 0 10px;
+        padding: 12px 14px;
+        background: #fff;
+        border: 1px solid #dcdcdc;
+        border-radius: 8px;
+      }
+      ._q91b a {
+        font-size: 15px;
+        font-weight: 600;
+        color: #0a66a6;
+        text-decoration: none;
+      }
+      ._m44c {
+        color: #666;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 style="font-size: 18px">Demo: new-style markup</h1>
+    <p class="banner">
+      Invented listings again, but deliberately hostile markup: no data-job-id, no
+      job-card-container, no recognisable class names at all. Cards are found only by the
+      /jobs/view/ link they contain. If this page filters, discovery no longer depends on
+      knowing what LinkedIn calls things.
+    </p>
+
+    <!-- clean -->
+    <div class="_x7f2a">
+      <div class="_q91b"><a href="/jobs/view/4445228614/?trk=x">Senior Backend Engineer</a></div>
+      <div class="_m44c">Northwind Systems &middot; Austin, TX</div>
+      <p>Go and Postgres. Recruiter screen, technical interview, then system design. Apply on our careers site.</p>
+    </div>
+
+    <!-- scam: off-platform contact. Two links to the SAME job id, as real cards often have -->
+    <div class="_x7f2a">
+      <div class="_q91b"><a href="/jobs/view/4445228615/">Urgent Requirement: Data Analyst</a></div>
+      <div class="_m44c">Global Talent Partners &middot; Remote</div>
+      <p>Immediate joiners only. Contact on WhatsApp +1 555 0142 8899 for the JD.</p>
+      <a href="/jobs/view/4445228615/?apply=1">Easy Apply</a>
+    </div>
+
+    <p class="sep">We found more results related to your search that may not be exact matches.</p>
+
+    <!-- below the divider, as LinkedIn renders related results -->
+    <section>
+      <div class="_x7f2a">
+        <div class="_q91b"><a href="/jobs/view/4445228616/">Accounts Executive</a></div>
+        <div class="_m44c">Meridian Consultancy &middot; Remote</div>
+        <p>Direct joining, no interview needed, selection guaranteed. CV to meridian.hiring@gmail.com</p>
+      </div>
+
+      <div class="_x7f2a">
+        <div class="_q91b"><a href="/jobs/view/4445228617/">Staff Site Reliability Engineer</a></div>
+        <div class="_m44c">Harbour Analytics &middot; Remote (US)</div>
+        <p>$150 per hour contract, 10+ years required. Terraform and Kubernetes.</p>
+      </div>
+    </section>
+
+    <script>
+      const localStore = { counts: {}, marked: [] };
+      window.chrome = {
+        runtime: {},
+        storage: {
+          sync: { get: (d, cb) => cb(d), set: (_o, cb) => cb && cb() },
+          local: {
+            get: (d, cb) => cb(Object.assign({}, d, localStore)),
+            set: (o, cb) => {
+              Object.assign(localStore, o);
+              cb && cb();
+            }
+          }
+        }
+      };
+    </script>
+    <script src="../../cards.js"></script>
+    <script src="../../counters.js"></script>
+    <script src="../../rules.js"></script>
+    <script src="../../content.js"></script>
+    <script>
+      if (location.search.includes('autotest')) {
+        setTimeout(() => {
+          const out = [];
+          const cards = document.querySelectorAll('[data-lfb-card]');
+          out.push('cards discovered: ' + cards.length + ' (want 4)');
+          out.push('collapsed: ' + document.querySelectorAll('[data-lfb-collapse]').length + ' (want 2)');
+          out.push(
+            'card is the listing box, not a wrapper: ' +
+              (cards.length && cards[0].className === '_x7f2a' ? 'YES (' + cards[0].className + ')' : 'NO')
+          );
+
+          // below the "related results" divider
+          const below = document.querySelectorAll('section [data-lfb-card]').length;
+          out.push('cards below the divider: ' + below + ' (want 2)');
+
+          // hover + mark on a card below the divider
+          const target = document.querySelectorAll('section [data-lfb-card]')[1];
+          target.querySelector('p').dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+          out.push('hover outline: ' + (target.hasAttribute('data-lfb-hover') ? 'YES' : 'NO'));
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true }));
+          setTimeout(() => {
+            out.push('after F, marked: ' + (target.hasAttribute('data-lfb-marked') ? 'YES' : 'NO'));
+            out.push('stored: ' + localStore.marked.length);
+            const pre = document.createElement('pre');
+            pre.id = 'autotest-result';
+            pre.textContent = out.join('\n');
+            document.body.appendChild(pre);
+          }, 40);
+        }, 400);
+      }
+    </script>
+  </body>
+</html>

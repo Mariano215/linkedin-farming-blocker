@@ -52,6 +52,64 @@
     return Boolean(fp) && !hasNestedCard && fp.length <= MAX_CHARS;
   }
 
+  // Structural card discovery.
+  //
+  // Class-name selectors rot: LinkedIn shipped a new jobs UI and every one of them matched
+  // nothing, so the extension silently did nothing at all. Anchors are far more stable,
+  // because the URL shape (/jobs/view/<id>) is a routing contract rather than styling.
+  //
+  // Walk up from an anchor and keep the OUTERMOST ancestor whose job links all point at
+  // the same listing. One step further up would swallow a sibling card, which is the
+  // container-collapse bug that blanked whole page regions.
+  const ANCHORS = {
+    jobs: { sel: 'a[href*="/jobs/view/"]', id: /\/jobs\/view\/(\d+)/ },
+    feed: { sel: 'a[href*="/feed/update/"]', id: /\/feed\/update\/([^/?#]+)/ },
+    messaging: { sel: 'a[href*="/messaging/thread/"]', id: /\/messaging\/thread\/([^/?#]+)/ }
+  };
+
+  const MAX_WALK = 10;
+
+  function idsWithin(el, anchor) {
+    const ids = new Set();
+    for (const a of el.querySelectorAll(anchor.sel)) {
+      const m = anchor.id.exec(a.getAttribute('href') || '');
+      if (m) ids.add(m[1]);
+    }
+    return ids;
+  }
+
+  function cardFor(anchorEl, anchor) {
+    let el = anchorEl.parentElement;
+    let best = null;
+    for (let i = 0; i < MAX_WALK && el && el !== document.body; i++, el = el.parentElement) {
+      const ids = idsWithin(el, anchor);
+      if (ids.size !== 1) break; // grown far enough to include a neighbouring card
+      if (norm(el.textContent).length > MAX_CHARS) break;
+      best = el;
+    }
+    return best;
+  }
+
+  // Union of the structural pass and the legacy selectors, so both the new and the old
+  // markup work and neither one going stale takes the extension down.
+  function findCards(surface, legacySel) {
+    const found = new Set();
+    const anchor = ANCHORS[surface];
+    if (anchor) {
+      for (const a of document.querySelectorAll(anchor.sel)) {
+        const card = cardFor(a, anchor);
+        if (card) found.add(card);
+      }
+    }
+    if (legacySel) {
+      for (const el of document.querySelectorAll(legacySel)) {
+        // Skip a legacy match that merely wraps a card the structural pass already found.
+        if (!Array.from(found).some((f) => el.contains(f) && el !== f)) found.add(el);
+      }
+    }
+    return Array.from(found);
+  }
+
   function makeSeen() {
     return { page: null, posters: new Map(), listings: new Map() };
   }
@@ -83,7 +141,7 @@
     return true;
   }
 
-  const api = { norm, fingerprint, cardId, collapsible, MAX_CHARS, makeSeen, bump, countOf, syncPage };
+  const api = { norm, fingerprint, cardId, collapsible, findCards, MAX_CHARS, makeSeen, bump, countOf, syncPage };
   root.LFBCards = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

@@ -55,17 +55,17 @@
 
     <!-- clean -->
     <div class="_x7f2a">
-      <div class="_q91b"><a href="/jobs/view/4445228614/?trk=x">Senior Backend Engineer</a></div>
+      <div class="_q91b"><a href="/jobs/search-results/?currentJobId=4445228614">Senior Backend Engineer</a></div>
       <div class="_m44c">Northwind Systems &middot; Austin, TX</div>
       <p>Go and Postgres. Recruiter screen, technical interview, then system design. Apply on our careers site.</p>
     </div>
 
     <!-- scam: off-platform contact. Two links to the SAME job id, as real cards often have -->
     <div class="_x7f2a">
-      <div class="_q91b"><a href="/jobs/view/4445228615/">Urgent Requirement: Data Analyst</a></div>
+      <div class="_q91b"><a href="/jobs/search-results/?currentJobId=4445228615">Urgent Requirement: Data Analyst</a></div>
       <div class="_m44c">Global Talent Partners &middot; Remote</div>
       <p>Immediate joiners only. Contact on WhatsApp +1 555 0142 8899 for the JD.</p>
-      <a href="/jobs/view/4445228615/?apply=1">Easy Apply</a>
+      <a href="/jobs/search-results/?currentJobId=4445228615">Easy Apply</a>
     </div>
 
     <p class="sep">We found more results related to your search that may not be exact matches.</p>
@@ -73,22 +73,27 @@
     <!-- below the divider, as LinkedIn renders related results -->
     <section>
       <div class="_x7f2a">
-        <div class="_q91b"><a href="/jobs/view/4445228616/">Accounts Executive</a></div>
+        <div class="_q91b"><a href="/jobs/search-results/?currentJobId=4445228616">Accounts Executive</a></div>
         <div class="_m44c">Meridian Consultancy &middot; Remote</div>
         <p>Direct joining, no interview needed, selection guaranteed. CV to meridian.hiring@gmail.com</p>
       </div>
 
       <div class="_x7f2a">
-        <div class="_q91b"><a href="/jobs/view/4445228617/">Staff Site Reliability Engineer</a></div>
+        <div class="_q91b"><a href="/jobs/search-results/?currentJobId=4445228617">Staff Site Reliability Engineer</a></div>
         <div class="_m44c">Harbour Analytics &middot; Remote (US)</div>
         <p>$150 per hour contract, 10+ years required. Terraform and Kubernetes.</p>
       </div>
     </section>
 
+
+    <div id="detail-pane" style="border:1px solid #ccc;padding:14px;background:#fff;margin-top:18px">
+      <h2 style="font-size:16px"><a href="/jobs/view/4445228614/">Senior Backend Engineer</a></h2>
+      <p>Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. Full job description text repeated to make this pane realistically long. </p>
+    </div>
     <script>
       const localStore = { counts: {}, marked: [] };
       window.chrome = {
-        runtime: {},
+        runtime: { id: "demo" },
         storage: {
           sync: { get: (d, cb) => cb(d), set: (_o, cb) => cb && cb() },
           local: {
@@ -120,6 +125,8 @@
           // below the "related results" divider
           const below = document.querySelectorAll('section [data-lfb-card]').length;
           out.push('cards below the divider: ' + below + ' (want 2)');
+          out.push('detail pane NOT a card: ' + (document.getElementById('detail-pane').hasAttribute('data-lfb-card') ? 'NO (bug)' : 'YES'));
+          out.push('no card swallows the detail pane: ' + ([...cards].some(c => c.contains(document.getElementById('detail-pane'))) ? 'NO (runaway walk)' : 'YES'));
 
           // hover + mark on a card below the divider
           const target = document.querySelectorAll('section [data-lfb-card]')[1];

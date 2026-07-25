@@ -61,13 +61,28 @@
   // Walk up from an anchor and keep the OUTERMOST ancestor whose job links all point at
   // the same listing. One step further up would swallow a sibling card, which is the
   // container-collapse bug that blanked whole page regions.
+  // Several anchor shapes per surface. The new jobs UI links its list cards to
+  // ?currentJobId=<id> and only the right-hand detail pane carries a /jobs/view/ link, so
+  // anchoring on /jobs/view/ alone finds the detail pane and none of the list.
   const ANCHORS = {
-    jobs: { sel: 'a[href*="/jobs/view/"]', id: /\/jobs\/view\/(\d+)/ },
-    feed: { sel: 'a[href*="/feed/update/"]', id: /\/feed\/update\/([^/?#]+)/ },
-    messaging: { sel: 'a[href*="/messaging/thread/"]', id: /\/messaging\/thread\/([^/?#]+)/ }
+    jobs: [
+      { sel: 'a[href*="currentJobId="]', id: /currentJobId=(\d+)/ },
+      { sel: 'a[href*="/jobs/view/"]', id: /\/jobs\/view\/(\d+)/ }
+    ],
+    feed: [{ sel: 'a[href*="/feed/update/"]', id: /\/feed\/update\/([^/?#]+)/ }],
+    messaging: [{ sel: 'a[href*="/messaging/thread/"]', id: /\/messaging\/thread\/([^/?#]+)/ }]
   };
 
   const MAX_WALK = 10;
+
+  // A size ceiling per surface, because the same-id rule alone is not enough. If a page
+  // holds only ONE job id of a given anchor shape, no second id ever appears and the walk
+  // climbs to a container spanning the whole layout. On the jobs page that means hovering
+  // a list item on the left highlights a block covering the detail pane on the right.
+  //
+  // A jobs list card is a couple of hundred characters. A job detail pane is thousands,
+  // which is also why it should never be treated as a card and collapsed.
+  const CARD_MAX = { jobs: 2000, feed: MAX_CHARS, messaging: 2000 };
 
   function idsWithin(el, anchor) {
     const ids = new Set();
@@ -78,13 +93,12 @@
     return ids;
   }
 
-  function cardFor(anchorEl, anchor) {
+  function cardFor(anchorEl, anchor, cap) {
     let el = anchorEl.parentElement;
     let best = null;
     for (let i = 0; i < MAX_WALK && el && el !== document.body; i++, el = el.parentElement) {
-      const ids = idsWithin(el, anchor);
-      if (ids.size !== 1) break; // grown far enough to include a neighbouring card
-      if (norm(el.textContent).length > MAX_CHARS) break;
+      if (idsWithin(el, anchor).size !== 1) break; // reached a neighbouring card
+      if (norm(el.textContent).length > cap) break; // reached a layout container
       best = el;
     }
     return best;
@@ -93,21 +107,31 @@
   // Union of the structural pass and the legacy selectors, so both the new and the old
   // markup work and neither one going stale takes the extension down.
   function findCards(surface, legacySel) {
-    const found = new Set();
-    const anchor = ANCHORS[surface];
-    if (anchor) {
+    const cap = CARD_MAX[surface] || MAX_CHARS;
+    const byId = new Map();
+
+    for (const anchor of ANCHORS[surface] || []) {
       for (const a of document.querySelectorAll(anchor.sel)) {
-        const card = cardFor(a, anchor);
-        if (card) found.add(card);
+        const m = anchor.id.exec(a.getAttribute('href') || '');
+        if (!m) continue;
+        const card = cardFor(a, anchor, cap);
+        if (!card) continue;
+        // One listing can be reachable by more than one anchor shape, typically a compact
+        // card in the list and the big detail pane. Keep the smaller: that is the card.
+        const prev = byId.get(m[1]);
+        if (!prev || norm(card.textContent).length < norm(prev.textContent).length) byId.set(m[1], card);
       }
     }
+
+    const found = new Set(byId.values());
     if (legacySel) {
       for (const el of document.querySelectorAll(legacySel)) {
         // Skip a legacy match that merely wraps a card the structural pass already found.
         if (!Array.from(found).some((f) => el.contains(f) && el !== f)) found.add(el);
       }
     }
-    return Array.from(found);
+    // Never keep an element that contains another kept element.
+    return Array.from(found).filter((el) => !Array.from(found).some((o) => o !== el && el.contains(o)));
   }
 
   function makeSeen() {

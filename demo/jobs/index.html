@@ -127,7 +127,7 @@
       // The local store is real (in memory) so marking and unmarking actually round-trip.
       const localStore = { counts: {}, marked: [] };
       window.chrome = {
-        runtime: {},
+        runtime: { id: "demo" },
         storage: {
           sync: { get: (defaults, cb) => cb(defaults), set: (_o, cb) => cb && cb() },
           local: {

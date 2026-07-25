@@ -15,8 +15,22 @@
   let opts = { enabled: true, mode: 'collapse', marking: true, disabled: [], phrases: [], allow: [], blockPosters: [] };
 
   const counter = globalThis.LFBCounters.makeCounter({
-    get: (defaults, cb) => chrome.storage.local.get(defaults, cb),
-    set: (obj, cb) => chrome.storage.local.set(obj, () => cb(chrome.runtime.lastError || null))
+    // Wrapped: once the extension context is invalidated these throw, and an uncaught
+    // throw here would take down the scan that called it.
+    get: (defaults, cb) => {
+      try {
+        chrome.storage.local.get(defaults, cb);
+      } catch (_) {
+        cb({ counts: {} });
+      }
+    },
+    set: (obj, cb) => {
+      try {
+        chrome.storage.local.set(obj, () => cb(chrome.runtime.lastError || null));
+      } catch (e) {
+        cb(e);
+      }
+    }
   });
 
   const SELECTORS = {
@@ -125,6 +139,18 @@
   // absolutely-positioned children, or an element in normal flow, which shifts their
   // layout. Both are how this extension broke the page before. An outline plus a hotkey
   // changes nothing about the document.
+  // After the extension is reloaded from chrome://extensions, the content script already
+  // in the page is orphaned: it keeps running, but every chrome.* call throws
+  // "Extension context invalidated". Without this check marking just stops working with no
+  // error the user ever sees.
+  function alive() {
+    try {
+      return Boolean(chrome.runtime && chrome.runtime.id);
+    } catch (_) {
+      return false;
+    }
+  }
+
   function toast(msg) {
     let el = document.getElementById('lfb-toast');
     if (!el) {
@@ -213,6 +239,10 @@
   // F toggles. Pressing it twice on the same card marks then unmarks, so a mistyped mark
   // costs nothing. Anything marked earlier can be removed individually in options.
   function mark(el, surface) {
+    if (!alive()) {
+      toast('The extension was reloaded. Refresh this page (Cmd+Shift+R) before marking.');
+      return;
+    }
     const fp = C.fingerprint(el);
     const key = C.cardId(el, fp);
     const ctx = buildCtx(el, surface, fp);
@@ -348,6 +378,15 @@
     chrome.storage.local.get({ marked: [] }, (data) => {
       for (const m of data.marked || []) if (m.key) markedKeys.add(m.key);
       scan();
+      // One line, so "is it running and what did it find" is answerable from the console
+      // instead of by guessing across a support round-trip.
+      console.info(
+        '[lfb] active. surface=%s cards=%d flagged=%d path=%s',
+        surfaceOf(location.pathname),
+        document.querySelectorAll('[data-lfb-card]').length,
+        flagged,
+        location.pathname
+      );
     });
     // childList only, and the records are not even read: any mutation just means "scan
     // again soon". Reading them was pure cost, since the scan covers the document anyway.

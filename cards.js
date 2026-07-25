@@ -35,6 +35,20 @@
     return 'fp:' + (fp == null ? fingerprint(el) : fp);
   }
 
+  // Biggest blast radius in the whole extension. querySelectorAll returns ancestors as
+  // well as descendants, and LinkedIn reuses attributes like data-job-id on both a card
+  // and the layout container around it. Collapsing a container hides a whole region of
+  // the page, which reads to the user as "LinkedIn is broken".
+  //
+  // So: only ever act on the innermost match, and never on something far too big to be
+  // one card. MAX_CHARS is deliberately loose. A long feed post runs to a few thousand
+  // characters; a page region runs to tens of thousands.
+  const MAX_CHARS = 6000;
+
+  function collapsible(fp, hasNestedCard) {
+    return Boolean(fp) && !hasNestedCard && fp.length <= MAX_CHARS;
+  }
+
   function makeSeen() {
     return { page: null, posters: new Map(), listings: new Map() };
   }
@@ -66,7 +80,7 @@
     return true;
   }
 
-  const api = { norm, fingerprint, cardId, makeSeen, bump, countOf, syncPage };
+  const api = { norm, fingerprint, cardId, collapsible, MAX_CHARS, makeSeen, bump, countOf, syncPage };
   root.LFBCards = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

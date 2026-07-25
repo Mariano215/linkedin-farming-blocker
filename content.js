@@ -9,7 +9,7 @@
   // swaps the content inside them, so a card has to be re-checked when its text changes.
   const lastFp = new WeakMap();
   const seen = C.makeSeen();
-  let opts = { disabled: [], phrases: [], allow: [] };
+  let opts = { enabled: true, disabled: [], phrases: [], allow: [] };
 
   const counter = globalThis.LFBCounters.makeCounter({
     get: (defaults, cb) => chrome.storage.local.get(defaults, cb),
@@ -105,9 +105,12 @@
     el.insertBefore(bar, el.firstChild);
   }
 
-  function process(el, surface) {
+  function process(el, surface, sel) {
     const fp = C.fingerprint(el);
     if (!fp || lastFp.get(el) === fp) return;
+    // Innermost match only, and nothing card-sized-or-smaller fails this. Guards against
+    // hiding a layout container, which blanks out a whole region of the page.
+    if (!C.collapsible(fp, Boolean(el.querySelector(sel)))) return;
     lastFp.set(el, fp);
     clearVerdict(el);
 
@@ -122,6 +125,7 @@
   }
 
   function scan(node) {
+    if (opts.enabled === false) return;
     const surface = surfaceOf(location.pathname);
     if (!surface) return;
     C.syncPage(seen, location.pathname + location.search);
@@ -130,10 +134,10 @@
     if (node && node !== document && node.closest) {
       // A mutation often only adds a descendant, so climb to the card that owns it.
       const own = node.closest(sel);
-      if (own) process(own, surface);
+      if (own) process(own, surface, sel);
     }
     const scope = node && node.querySelectorAll ? node : document;
-    scope.querySelectorAll(sel).forEach((el) => process(el, surface));
+    scope.querySelectorAll(sel).forEach((el) => process(el, surface, sel));
   }
 
   const idle = globalThis.requestIdleCallback || ((fn) => setTimeout(fn, 150));
@@ -153,17 +157,19 @@
     });
   }
 
-  chrome.storage.sync.get({ disabled: [], phrases: [], allow: [] }, (data) => {
+  chrome.storage.sync.get({ enabled: true, disabled: [], phrases: [], allow: [] }, (data) => {
     opts = data;
+    if (opts.enabled === false) return;
     scan(document);
+    // childList only. Watching characterData across all of document.body is a firehose on
+    // LinkedIn, and it buys nothing: recycling a card replaces child nodes, which fires
+    // childList anyway, and the fingerprint catches the new content from there.
     new MutationObserver((muts) => {
       const touched = [];
       for (const m of muts) {
         for (const n of m.addedNodes) if (n.nodeType === 1) touched.push(n);
-        // Text swapped inside a recycled card: re-check the card that owns the target.
-        if (m.type === 'characterData' && m.target.parentElement) touched.push(m.target.parentElement);
       }
       if (touched.length) schedule(touched);
-    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+    }).observe(document.body, { childList: true, subtree: true });
   });
 })();

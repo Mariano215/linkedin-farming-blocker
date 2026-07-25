@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import '../cards.js';
 
-const { fingerprint, cardId, makeSeen, bump, countOf, syncPage } = globalThis.LFBCards;
+const { fingerprint, cardId, collapsible, MAX_CHARS, makeSeen, bump, countOf, syncPage } = globalThis.LFBCards;
 
 // Minimal stand-in for a card element. cards.js is duck-typed, so no DOM is needed.
 function node(text, attrs = {}) {
@@ -62,6 +62,24 @@ test('cards with no id attribute fall back to their content', () => {
 
   const c = node('Different listing entirely');
   assert.notEqual(cardId(a, fingerprint(a)), cardId(c, fingerprint(c)));
+});
+
+test('fix: a container holding other cards is never collapsed', () => {
+  // This is what broke the page: LinkedIn puts data-job-id on the card AND on the
+  // layout container around it, querySelectorAll returns both, and hiding the container
+  // blanks out a whole region.
+  const card = 'Java Developer at Acme, Austin TX';
+  assert.equal(collapsible(card, false), true, 'a plain card is fine');
+  assert.equal(collapsible(card, true), false, 'not if it contains another card');
+
+  // second net: nothing anywhere near a page region's size, even with no nested match
+  assert.equal(collapsible('x'.repeat(MAX_CHARS + 1), false), false);
+  assert.equal(collapsible('x'.repeat(MAX_CHARS), false), true);
+
+  // a long but believable feed post still gets filtered
+  assert.equal(collapsible('Comment INTERESTED. ' + 'lorem ipsum '.repeat(200), false), true);
+
+  assert.equal(collapsible('', false), false, 'empty text is not a card');
 });
 
 test('fix: client-side navigation clears per-page counts', () => {

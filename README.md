@@ -105,9 +105,14 @@ If you do not want to see one specific person, block that person. See below.
 again to re-hide. It is also the diagnostic. If it reads `40 hidden` on a page of 25
 jobs, the rules are misfiring, not the page.
 
-**Marking.** Hover any card and press <kbd>F</kbd>. The card outlines, a toast confirms,
-and the text is stored locally. No button is injected into LinkedIn's markup, so nothing
-about their layout changes.
+**Marking.** Hover any card and press <kbd>F</kbd>. Hovering outlines the card in dashed
+amber and shows a pill at the bottom left reading "Press F to mark this card". Marking
+turns the card grey with a solid red outline, and it stays that way through scrolling and
+reloads. No button is injected into LinkedIn's markup, so nothing about their layout
+changes.
+
+If the pill never appears while you move over cards, hover detection is failing rather
+than the key, which means the selectors need updating for LinkedIn's current markup.
 
 **Undoing a mark.** <kbd>F</kbd> toggles, so pressing it again on the same card unmarks it.
 For one you notice later, the options page lists every marked card under **Cards you

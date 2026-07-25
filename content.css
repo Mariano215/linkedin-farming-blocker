@@ -67,8 +67,44 @@
 /* Marking outlines the card under the cursor. Outline, not border or position, because it
    does not affect layout at all. */
 [data-lfb-hover] {
-  outline: 2px dashed #b48a18 !important;
-  outline-offset: -2px;
+  outline: 3px dashed #b48a18 !important;
+  outline-offset: -3px;
+  background-color: #fffaf0 !important;
+}
+
+/* A marked card stays visibly marked: greyed, struck with a red edge, and it survives a
+   scroll or a reload. The toast alone was too easy to miss. */
+[data-lfb-marked] {
+  outline: 3px solid #b42318 !important;
+  outline-offset: -3px;
+  /* No grayscale filter here: it desaturates the red outline that carries the meaning. */
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+[data-lfb-marked][data-lfb-hover] {
+  opacity: 0.8;
+}
+
+/* Fixed, so it never touches LinkedIn's layout. Also the fastest way to tell whether the
+   cursor is being seen at all. */
+#lfb-hint {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2147483000;
+  padding: 7px 13px;
+  font: 500 12px/1.3 -apple-system, system-ui, sans-serif;
+  color: #fff;
+  background: #b48a18;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 30%);
+  pointer-events: none;
+}
+#lfb-hint[data-lfb-state='marked'] {
+  background: #b42318;
+}
+#lfb-hint[hidden] {
+  display: none;
 }
 
 #lfb-toast {

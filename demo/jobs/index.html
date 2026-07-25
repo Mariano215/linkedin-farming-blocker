@@ -124,13 +124,18 @@
 
     <script>
       // Minimal chrome.storage shim so the real content script runs outside an extension.
+      // The local store is real (in memory) so marking and unmarking actually round-trip.
+      const localStore = { counts: {}, marked: [] };
       window.chrome = {
         runtime: {},
         storage: {
           sync: { get: (defaults, cb) => cb(defaults), set: (_o, cb) => cb && cb() },
           local: {
-            get: (defaults, cb) => cb(Object.assign({ counts: {}, marked: [] }, defaults)),
-            set: (_o, cb) => cb && cb()
+            get: (defaults, cb) => cb(Object.assign({}, defaults, localStore)),
+            set: (obj, cb) => {
+              Object.assign(localStore, obj);
+              cb && cb();
+            }
           }
         }
       };
@@ -139,5 +144,46 @@
     <script src="../../counters.js"></script>
     <script src="../../rules.js"></script>
     <script src="../../content.js"></script>
+    <script>
+      // Self-test for the mark path: ?autotest drives a real hover and a real F keypress
+      // through the same listeners a user hits, then reports what happened. Marking is
+      // pure DOM interaction, so this is the only way to check it without a browser driver.
+      if (location.search.includes('autotest')) {
+        setTimeout(() => {
+          const out = [];
+          const card = document.querySelector('[data-job-id="1001"]');
+          const target = card.querySelector('.body');
+
+          target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+          out.push('hover outline: ' + (card.hasAttribute('data-lfb-hover') ? 'YES' : 'NO'));
+          out.push('hint shown: ' + (!document.getElementById('lfb-hint').hidden ? 'YES' : 'NO'));
+
+          const press = () =>
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true }));
+
+          press();
+          setTimeout(() => {
+            out.push('after 1st F, marked: ' + (card.hasAttribute('data-lfb-marked') ? 'YES' : 'NO'));
+            out.push('stored: ' + localStore.marked.length);
+
+            press();
+            setTimeout(() => {
+              out.push('after 2nd F, marked: ' + (card.hasAttribute('data-lfb-marked') ? 'YES' : 'NO'));
+              out.push('stored: ' + localStore.marked.length);
+
+              // capital F, as shift or caps lock sends
+              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F', bubbles: true }));
+              setTimeout(() => {
+                out.push('after shift-F, marked: ' + (card.hasAttribute('data-lfb-marked') ? 'YES' : 'NO'));
+                const pre = document.createElement('pre');
+                pre.id = 'autotest-result';
+                pre.textContent = out.join('\n');
+                document.body.appendChild(pre);
+              }, 30);
+            }, 30);
+          }, 30);
+        }, 300);
+      }
+    </script>
   </body>
 </html>

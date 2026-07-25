@@ -9,6 +9,9 @@
   // swaps the content inside them, so a card has to be re-checked when its text changes.
   const lastFp = new WeakMap();
   const seen = C.makeSeen();
+  // Keys of cards already marked, so a marked card still looks marked after a scroll,
+  // a re-render, or a page reload.
+  const markedKeys = new Set();
   let opts = { enabled: true, mode: 'collapse', marking: true, disabled: [], phrases: [], allow: [], blockPosters: [] };
 
   const counter = globalThis.LFBCounters.makeCounter({
@@ -135,6 +138,26 @@
   }
 
   let hovered = null;
+  let hint = null;
+
+  // A fixed-position hint, never injected into the card, so it cannot disturb layout.
+  // It also answers "is this thing even seeing my cursor?", which an outline alone does
+  // not: no hint means hover detection is failing, not the key.
+  function showHint(card) {
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.id = 'lfb-hint';
+      document.body.appendChild(hint);
+    }
+    if (!card) {
+      hint.hidden = true;
+      return;
+    }
+    hint.hidden = false;
+    const marked = markedKeys.has(C.cardId(card, C.fingerprint(card)));
+    hint.textContent = marked ? 'Marked. Press F to undo' : 'Press F to mark this card';
+    hint.dataset.lfbState = marked ? 'marked' : 'hover';
+  }
 
   function trackHover(surface, sel) {
     document.addEventListener(
@@ -146,19 +169,31 @@
         if (hovered) hovered.removeAttribute('data-lfb-hover');
         hovered = card;
         if (hovered) hovered.setAttribute('data-lfb-hover', '');
+        showHint(hovered);
       },
       { passive: true }
     );
 
-    document.addEventListener('keydown', (e) => {
-      if (opts.marking === false || e.key !== 'f' || e.metaKey || e.ctrlKey || e.altKey) return;
-      const t = e.target;
-      // Never steal the key while the user is typing.
-      if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
-      if (!hovered) return;
-      e.preventDefault();
-      mark(hovered, surface);
-    });
+    // Capture phase: LinkedIn handles keys of its own and can stop propagation before a
+    // listener on document would ever see the event.
+    document.addEventListener(
+      'keydown',
+      (e) => {
+        if (opts.marking === false || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.key !== 'f' && e.key !== 'F') return; // shift or caps lock sends 'F'
+        const t = e.target;
+        // Never steal the key while the user is typing.
+        if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
+        if (!hovered) {
+          toast('Point at a job card first, then press F.');
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        mark(hovered, surface);
+      },
+      true
+    );
   }
 
   // Stores text only, locally. No network, no account, capped so it stays a phrase corpus
@@ -176,9 +211,16 @@
 
       if (at >= 0) {
         marked.splice(at, 1);
+        markedKeys.delete(key);
+        el.removeAttribute('data-lfb-marked');
+        showHint(el);
         chrome.storage.local.set({ marked }, () => toast('Unmarked. ' + marked.length + ' still saved.'));
         return;
       }
+
+      markedKeys.add(key);
+      el.setAttribute('data-lfb-marked', '');
+      showHint(el);
 
       marked.push({
         key,
@@ -204,6 +246,8 @@
     // whole region of the page.
     if (!C.collapsible(fp, Boolean(el.querySelector(sel)))) return;
     clearVerdict(el);
+
+    if (markedKeys.has(C.cardId(el, fp))) el.setAttribute('data-lfb-marked', '');
 
     const ctx = buildCtx(el, surface, fp);
     if (allowed(ctx)) return;
@@ -284,7 +328,10 @@
     document.documentElement.setAttribute('data-lfb-mode', opts.mode);
     const surface = surfaceOf(location.pathname);
     if (surface) trackHover(surface, SELECTORS[surface]);
-    scan();
+    chrome.storage.local.get({ marked: [] }, (data) => {
+      for (const m of data.marked || []) if (m.key) markedKeys.add(m.key);
+      scan();
+    });
     // childList only, and the records are not even read: any mutation just means "scan
     // again soon". Reading them was pure cost, since the scan covers the document anyway.
     new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });

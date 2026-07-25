@@ -159,12 +159,17 @@
     hint.dataset.lfbState = marked ? 'marked' : 'hover';
   }
 
-  function trackHover(surface, sel) {
+  // Surface is resolved per event, never captured at load. LinkedIn navigates client-side,
+  // so a script that loads on /feed and captures the feed selectors will match nothing
+  // once you click through to Jobs, for the rest of the tab's life.
+  function trackHover() {
     document.addEventListener(
       'mouseover',
       (e) => {
         if (opts.marking === false) return;
-        const card = e.target.closest && e.target.closest(sel);
+        const surface = surfaceOf(location.pathname);
+        const sel = surface ? SELECTORS[surface] : null;
+        const card = sel && e.target.closest ? e.target.closest(sel) : null;
         if (card === hovered) return;
         if (hovered) hovered.removeAttribute('data-lfb-hover');
         hovered = card;
@@ -184,8 +189,14 @@
         const t = e.target;
         // Never steal the key while the user is typing.
         if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
+        const surface = surfaceOf(location.pathname);
         if (!hovered) {
-          toast('Point at a job card first, then press F.');
+          // Say which of the two things is wrong, rather than blaming the cursor.
+          toast(
+            surface
+              ? 'No card matched under the cursor on the ' + surface + ' surface. Selectors may be stale.'
+              : 'Not a filtered page (' + location.pathname + '). Marking works on jobs, feed, and messaging.'
+          );
           return;
         }
         e.preventDefault();
@@ -327,7 +338,7 @@
     if (opts.enabled === false) return;
     document.documentElement.setAttribute('data-lfb-mode', opts.mode);
     const surface = surfaceOf(location.pathname);
-    if (surface) trackHover(surface, SELECTORS[surface]);
+    trackHover();
     chrome.storage.local.get({ marked: [] }, (data) => {
       for (const m of data.marked || []) if (m.key) markedKeys.add(m.key);
       scan();

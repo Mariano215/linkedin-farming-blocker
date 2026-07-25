@@ -418,17 +418,27 @@
     opts = data;
     if (opts.enabled === false) return;
     document.documentElement.setAttribute('data-lfb-mode', opts.mode);
-    const surface = surfaceOf(location.pathname);
     trackHover();
     chrome.storage.local.get({ marked: [] }, (data) => {
       for (const m of data.marked || []) if (m.key) markedKeys.add(m.key);
-      scan();
-      // The whole state in one expandable object, so "is it running and what did it find"
-      // is answerable from the console instead of by guessing across a support round-trip.
-      console.info('[lfb] active', diagReport());
+
+      const start = () => {
+        scan();
+        // The whole state in one expandable object, so "is it running and what did it
+        // find" is answerable from the console instead of across a support round-trip.
+        console.info('[lfb] active', diagReport());
+        // childList only, and the records are not even read: any mutation just means
+        // "scan again soon". The scan covers the document anyway.
+        new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+      };
+
+      // LinkedIn's new jobs UI is React and hydrates server-rendered HTML shortly after
+      // load. Inserting a stub into a card BEFORE hydration makes the DOM differ from
+      // what React expects (their error #418), React re-renders, our observer re-scans,
+      // and the page churns. Waiting for load plus a beat costs a moment of visible spam
+      // and avoids the fight entirely.
+      if (document.readyState === 'complete') setTimeout(start, 800);
+      else window.addEventListener('load', () => setTimeout(start, 800), { once: true });
     });
-    // childList only, and the records are not even read: any mutation just means "scan
-    // again soon". Reading them was pure cost, since the scan covers the document anyway.
-    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
   });
 })();

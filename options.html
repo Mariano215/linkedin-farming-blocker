@@ -83,11 +83,28 @@
 
     <button id="save">Save</button><span id="saved"></span>
 
+    <h2>Learned from cards you marked</h2>
+    <p class="sev">
+      Hover a card on LinkedIn and press <strong>F</strong> to mark it. Phrases that recur
+      across at least two marked cards show up here. Nothing is added as a rule until you
+      click Add.
+    </p>
+    <div id="learn"></div>
+
+    <h2>Blocked posters</h2>
+    <p class="sev">
+      Individuals you never want to see. This is an explicit list you build, one person at
+      a time.
+    </p>
+    <textarea id="blockPosters" placeholder="/in/some-profile-slug&#10;A Person's Name"></textarea>
+
     <h2>Hits so far</h2>
     <table id="counts"></table>
     <button id="reset">Reset counts</button>
+    <button id="clearMarks">Clear marked cards</button>
 
     <script src="rules.js"></script>
+    <script src="learn.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

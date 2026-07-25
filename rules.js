@@ -132,6 +132,18 @@
       )
     },
     {
+      // Third-party body-shop vocabulary. This is a business model, not a place: US-based
+      // agencies use exactly the same language, and plenty of offshore recruiters never
+      // touch it. That is the point, it matches the practice rather than the person.
+      id: 'body-shop',
+      label: 'third-party staffing / bench sales',
+      surfaces: ['jobs', 'feed', 'messaging'],
+      severity: 'weak',
+      test: notNegated(
+        /\b(corp to corp|corp-to-corp|c2c\b|bench sales|bench candidates|rate confirmation|hotlist|hot list of consultants|submit(ting)? (your )?(resume|profile) to (my|our) client|implementation partner|prime vendor|w2 only|1099 only|third party (staffing|vendor))\b/
+      )
+    },
+    {
       id: 'unrealistic-pay',
       label: 'low-skill role, implausible pay',
       surfaces: ['jobs', 'feed'],
@@ -198,6 +210,17 @@
     }
     const phrase = phrases.find((p) => p && ctx.text.includes(p.toLowerCase()));
     if (phrase) hits.push({ id: 'user-phrase', label: 'your phrase: ' + phrase, severity: 'farming' });
+
+    // Posters you blocked by hand. Deliberate, individual, and yours: no inference from
+    // one person to a group, which is why this is a list you build and can see.
+    const url = (ctx.posterUrl || '').toLowerCase();
+    const name = (ctx.posterName || '').toLowerCase();
+    const blocked = ((opts && opts.blockPosters) || []).find((p) => {
+      const needle = String(p || '').toLowerCase();
+      return needle && ((url && url.includes(needle)) || (name && name.includes(needle)));
+    });
+    if (blocked) hits.push({ id: 'blocked-poster', label: 'poster you blocked: ' + blocked, severity: 'farming' });
+
     return verdict(hits);
   }
 

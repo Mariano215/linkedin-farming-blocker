@@ -5,10 +5,13 @@
 
   const norm = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
 
-  const isStub = (n) => Boolean(n && n.classList && n.classList.contains && n.classList.contains('lfb-stub'));
+  const OURS = ['lfb-stub', 'lfb-mark'];
+  const isOurs = (n) =>
+    Boolean(n && n.classList && n.classList.contains && OURS.some((c) => n.classList.contains(c)));
 
-  // The fingerprint ignores our own stub. Including it would change the fingerprint
-  // the moment we collapse a card, and the card would be reprocessed forever.
+  // The fingerprint ignores anything we injected ourselves. Including it would change the
+  // fingerprint the moment we touch a card, so the card would look new on the next scan
+  // and be processed again forever, appending another control each time.
   // textContent, not innerText: innerText forces layout and returns '' for the
   // children we just hid with display:none.
   function fingerprint(el) {
@@ -17,7 +20,7 @@
     if (!kids) return norm(el.textContent);
     return norm(
       kids
-        .filter((n) => !isStub(n))
+        .filter((n) => !isOurs(n))
         .map((n) => n.textContent)
         .join(' ')
     );

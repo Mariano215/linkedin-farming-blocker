@@ -9,7 +9,7 @@
   // swaps the content inside them, so a card has to be re-checked when its text changes.
   const lastFp = new WeakMap();
   const seen = C.makeSeen();
-  let opts = { enabled: true, mode: 'collapse', disabled: [], phrases: [], allow: [] };
+  let opts = { enabled: true, mode: 'collapse', marking: true, disabled: [], phrases: [], allow: [], blockPosters: [] };
 
   const counter = globalThis.LFBCounters.makeCounter({
     get: (defaults, cb) => chrome.storage.local.get(defaults, cb),
@@ -51,6 +51,10 @@
           .textContent || ''
       ) || null;
 
+    const nameEl = el.querySelector(
+      '.update-components-actor__title, .jobs-poster__name, .hirer-card__hirer-information a, .msg-conversation-listitem__participant-names'
+    );
+
     const ctx = {
       raw: fp,
       text: fp.toLowerCase(),
@@ -59,6 +63,7 @@
       company,
       companyUrl: companyLink || null,
       posterUrl: posterLink || null,
+      posterName: nameEl ? C.norm(nameEl.textContent) : null,
       posterCount: 0,
       dupeCount: 0
     };
@@ -103,6 +108,71 @@
     });
     bar.appendChild(show);
     el.insertBefore(bar, el.firstChild);
+  }
+
+  // Marking: hover a card, press F.
+  //
+  // No button is injected into the card. Injecting one means either absolute positioning,
+  // which needs position:relative on a LinkedIn card and re-anchors that card's own
+  // absolutely-positioned children, or an element in normal flow, which shifts their
+  // layout. Both are how this extension broke the page before. An outline plus a hotkey
+  // changes nothing about the document.
+  function toast(msg) {
+    let el = document.getElementById('lfb-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'lfb-toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => el.remove(), 2200);
+  }
+
+  let hovered = null;
+
+  function trackHover(surface, sel) {
+    document.addEventListener(
+      'mouseover',
+      (e) => {
+        if (opts.marking === false) return;
+        const card = e.target.closest && e.target.closest(sel);
+        if (card === hovered) return;
+        if (hovered) hovered.removeAttribute('data-lfb-hover');
+        hovered = card;
+        if (hovered) hovered.setAttribute('data-lfb-hover', '');
+      },
+      { passive: true }
+    );
+
+    document.addEventListener('keydown', (e) => {
+      if (opts.marking === false || e.key !== 'f' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target;
+      // Never steal the key while the user is typing.
+      if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
+      if (!hovered) return;
+      e.preventDefault();
+      mark(hovered, surface);
+    });
+  }
+
+  // Stores text only, locally. No network, no account, capped so it stays a phrase corpus
+  // rather than an archive of everything you read.
+  function mark(el, surface) {
+    const ctx = buildCtx(el, surface, C.fingerprint(el));
+    chrome.storage.local.get({ marked: [] }, (data) => {
+      const marked = data.marked || [];
+      marked.push({
+        text: ctx.raw.slice(0, 600),
+        title: ctx.title,
+        company: ctx.company,
+        posterName: ctx.posterName,
+        posterUrl: ctx.posterUrl
+      });
+      chrome.storage.local.set({ marked: marked.slice(-200) }, () => {
+        toast('Marked. ' + marked.length + ' saved, see the options page for suggested rules.');
+      });
+    });
   }
 
   function process(el, surface, sel) {
@@ -189,10 +259,12 @@
     }, rescanMs);
   }
 
-  chrome.storage.sync.get({ enabled: true, mode: 'collapse', disabled: [], phrases: [], allow: [] }, (data) => {
+  chrome.storage.sync.get({ enabled: true, mode: 'collapse', marking: true, disabled: [], phrases: [], allow: [], blockPosters: [] }, (data) => {
     opts = data;
     if (opts.enabled === false) return;
     document.documentElement.setAttribute('data-lfb-mode', opts.mode);
+    const surface = surfaceOf(location.pathname);
+    if (surface) trackHover(surface, SELECTORS[surface]);
     scan();
     // childList only, and the records are not even read: any mutation just means "scan
     // again soon". Reading them was pure cost, since the scan covers the document anyway.

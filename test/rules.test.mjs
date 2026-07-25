@@ -138,6 +138,33 @@ test('fix: urgency copy is not mistaken for a negation', () => {
   assert.equal(evaluate(ctx('Never repost this for reach.'), 'feed', {}), null);
 });
 
+test('blocking a poster hides them, and only them', () => {
+  const opts = { blockPosters: ['/in/some-recruiter'] };
+  const hit = evaluate(ctx('Java Developer, Austin TX', { posterUrl: '/in/some-recruiter' }), 'jobs', opts);
+  assert.equal(hit.action, 'collapse');
+  assert.equal(hit.hits[0].id, 'blocked-poster');
+
+  // matching by displayed name works too, for surfaces with no profile link
+  const byName = evaluate(ctx('Java Developer', { posterName: 'Some Recruiter' }), 'jobs', {
+    blockPosters: ['Some Recruiter']
+  });
+  assert.equal(byName.action, 'collapse');
+
+  // a different poster is untouched
+  assert.equal(evaluate(ctx('Java Developer', { posterUrl: '/in/someone-else' }), 'jobs', opts), null);
+});
+
+test('body-shop vocabulary is matched as a practice, not a place', () => {
+  // Fires on the business model wherever the poster is.
+  assert.ok(hitIds('Corp to corp only, rate confirmation attached.', 'jobs').includes('body-shop'));
+  assert.ok(hitIds('Bench sales recruiter, hotlist available on request.', 'jobs').includes('body-shop'));
+  assert.ok(hitIds('C2C requirement, submitting your resume to my client.', 'jobs').includes('body-shop'));
+
+  // and does not fire on an ordinary agency role, or on location
+  assert.equal(evaluate(ctx('Recruiter at Acme Staffing, Bengaluru. Apply on our portal.'), 'jobs', {}), null);
+  assert.equal(evaluate(ctx('US Recruitment team, hiring a Java Developer in Austin.'), 'jobs', {}), null);
+});
+
 test('fix: an ordinary job card is not dimmed for lacking a company link', () => {
   // LinkedIn prints the company as plain text on job cards, so companyUrl is null on
   // almost all of them. The old no-company-page rule therefore dimmed nearly every

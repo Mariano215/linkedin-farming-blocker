@@ -1,5 +1,7 @@
 # LinkedIn Farming & Scam Blocker
 
+[![test](https://github.com/Mariano215/linkedin-farming-blocker/actions/workflows/test.yml/badge.svg)](https://github.com/Mariano215/linkedin-farming-blocker/actions/workflows/test.yml)
+
 A Chrome extension that hides engagement farming and job scams on LinkedIn, and tells you
 why it hid each one.
 
@@ -195,6 +197,12 @@ warning, the selectors are matching far more than intended.
 Hit counts are a tuning aid, not an audit log. Two tabs flushing at the same instant can
 lose a delta.
 
+## Privacy
+
+No network calls, no account, no telemetry. Marked cards and settings stay in Chrome's
+local storage on your machine. See [PRIVACY.md](PRIVACY.md), which includes a one-line
+grep to verify the no-network claim yourself.
+
 ## License
 
-MIT. See `LICENSE`.
+MIT, Mattei Systems. See `LICENSE`.

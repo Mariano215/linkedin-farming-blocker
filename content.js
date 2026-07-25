@@ -108,10 +108,12 @@
   function process(el, surface, sel) {
     const fp = C.fingerprint(el);
     if (!fp || lastFp.get(el) === fp) return;
-    // Innermost match only, and nothing card-sized-or-smaller fails this. Guards against
-    // hiding a layout container, which blanks out a whole region of the page.
-    if (!C.collapsible(fp, Boolean(el.querySelector(sel)))) return;
+    // Recorded before the collapsible check, not after: containers fail that check on
+    // every single scan otherwise, and each failure costs a querySelector.
     lastFp.set(el, fp);
+    // Innermost match only. Guards against hiding a layout container, which blanks out a
+    // whole region of the page.
+    if (!C.collapsible(fp, Boolean(el.querySelector(sel)))) return;
     clearVerdict(el);
 
     const ctx = buildCtx(el, surface, fp);
@@ -124,52 +126,50 @@
     counter.add(res.hits.map((h) => h.id));
   }
 
-  function scan(node) {
+  function scan() {
     if (opts.enabled === false) return;
     const surface = surfaceOf(location.pathname);
     if (!surface) return;
     C.syncPage(seen, location.pathname + location.search);
 
     const sel = SELECTORS[surface];
-    if (node && node !== document && node.closest) {
-      // A mutation often only adds a descendant, so climb to the card that owns it.
-      const own = node.closest(sel);
-      if (own) process(own, surface, sel);
-    }
-    const scope = node && node.querySelectorAll ? node : document;
-    scope.querySelectorAll(sel).forEach((el) => process(el, surface, sel));
+    document.querySelectorAll(sel).forEach((el) => process(el, surface, sel));
   }
 
-  const idle = globalThis.requestIdleCallback || ((fn) => setTimeout(fn, 150));
-  // A Set, not an array: one card being retyped fires hundreds of characterData
-  // mutations on the same parent, and scanning it once per batch is enough.
-  let pending = new Set();
-  let queued = false;
-  function schedule(nodes) {
-    for (const n of nodes) pending.add(n);
-    if (queued) return;
-    queued = true;
-    idle(() => {
-      queued = false;
-      const batch = pending;
-      pending = new Set();
-      batch.forEach(scan);
-    });
+  // One trailing scan per burst, over the whole document.
+  //
+  // The obvious design, scanning each added node, is the slow one: LinkedIn adds
+  // thousands of nodes per scroll and their subtrees overlap, so the same elements get
+  // walked over and over. A single document.querySelectorAll costs about the same as one
+  // of those subtree walks and covers everything, and lastFp makes the per-card work
+  // nearly free on repeat visits.
+  //
+  // setTimeout, not requestIdleCallback: on a busy page idle never arrives, so work piles
+  // up and then lands all at once, which is exactly the stutter this is avoiding.
+  // Backs off if a scan ever turns out to be expensive, so the extension can never sit on
+  // the main thread and make the page feel broken. Ceiling is 5s between scans.
+  let rescanMs = 300;
+  let timer = null;
+  function schedule() {
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      const t0 = performance.now();
+      scan();
+      const cost = performance.now() - t0;
+      if (cost > 50 && rescanMs < 5000) {
+        rescanMs = Math.min(5000, rescanMs * 2);
+        console.warn('[lfb] scan took ' + Math.round(cost) + 'ms, backing off to ' + rescanMs + 'ms');
+      }
+    }, rescanMs);
   }
 
   chrome.storage.sync.get({ enabled: true, disabled: [], phrases: [], allow: [] }, (data) => {
     opts = data;
     if (opts.enabled === false) return;
-    scan(document);
-    // childList only. Watching characterData across all of document.body is a firehose on
-    // LinkedIn, and it buys nothing: recycling a card replaces child nodes, which fires
-    // childList anyway, and the fingerprint catches the new content from there.
-    new MutationObserver((muts) => {
-      const touched = [];
-      for (const m of muts) {
-        for (const n of m.addedNodes) if (n.nodeType === 1) touched.push(n);
-      }
-      if (touched.length) schedule(touched);
-    }).observe(document.body, { childList: true, subtree: true });
+    scan();
+    // childList only, and the records are not even read: any mutation just means "scan
+    // again soon". Reading them was pure cost, since the scan covers the document anyway.
+    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
   });
 })();

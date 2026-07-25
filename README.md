@@ -109,6 +109,10 @@ jobs, the rules are misfiring, not the page.
 and the text is stored locally. No button is injected into LinkedIn's markup, so nothing
 about their layout changes.
 
+**Undoing a mark.** <kbd>F</kbd> toggles, so pressing it again on the same card unmarks it.
+For one you notice later, the options page lists every marked card under **Cards you
+marked** with a **Remove** button, and **Clear marked cards** wipes the lot.
+
 **Turning marks into rules.** The options page mines your marked cards for phrases that
 recur across two or more of them and lists them with an **Add** button. Nothing becomes a
 rule until you click it. Phrases that identify people rather than describe behaviour are

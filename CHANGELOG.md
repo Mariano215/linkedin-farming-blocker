@@ -16,6 +16,8 @@ First release.
 - The rule learner will not propose a rule keyed on nationality, country, a city used as a
   proxy, or a person-location framing. Those phrases are reported back with the reason,
   alongside the alternative: blocking that individual poster.
+- Marking is a toggle: press <kbd>F</kbd> again on a card to undo it. Marked cards are
+  also listed individually in options, each with a **Remove** button.
 - Block posters by profile URL or displayed name.
 - Per-rule toggles, custom phrases, an allowlist, hit counts, and a master off switch.
 - No build step, no dependencies, no network calls. 31 tests under `node --test`.

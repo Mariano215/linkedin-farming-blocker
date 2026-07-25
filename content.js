@@ -163,11 +163,25 @@
 
   // Stores text only, locally. No network, no account, capped so it stays a phrase corpus
   // rather than an archive of everything you read.
+  //
+  // F toggles. Pressing it twice on the same card marks then unmarks, so a mistyped mark
+  // costs nothing. Anything marked earlier can be removed individually in options.
   function mark(el, surface) {
-    const ctx = buildCtx(el, surface, C.fingerprint(el));
+    const fp = C.fingerprint(el);
+    const key = C.cardId(el, fp);
+    const ctx = buildCtx(el, surface, fp);
     chrome.storage.local.get({ marked: [] }, (data) => {
       const marked = data.marked || [];
+      const at = marked.findIndex((m) => m.key === key);
+
+      if (at >= 0) {
+        marked.splice(at, 1);
+        chrome.storage.local.set({ marked }, () => toast('Unmarked. ' + marked.length + ' still saved.'));
+        return;
+      }
+
       marked.push({
+        key,
         text: ctx.raw.slice(0, 600),
         title: ctx.title,
         company: ctx.company,
@@ -175,7 +189,7 @@
         posterUrl: ctx.posterUrl
       });
       chrome.storage.local.set({ marked: marked.slice(-200) }, () => {
-        toast('Marked. ' + marked.length + ' saved, see the options page for suggested rules.');
+        toast('Marked (' + marked.length + '). Press F again on this card to undo.');
       });
     });
   }

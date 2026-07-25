@@ -117,6 +117,29 @@
           }
         }
 
+        wrap.append(head('Cards you marked'));
+        wrap.append(note('Remove any you marked by mistake. On LinkedIn, pressing F again on a card also undoes it.'));
+        marked
+          .slice()
+          .reverse()
+          .forEach((m, i) => {
+            const row = document.createElement('div');
+            row.style.margin = '3px 0';
+            const label = [m.title, m.company].filter(Boolean).join(' at ') || (m.text || '').slice(0, 70);
+            row.append(document.createTextNode(label + ' '));
+            const b = document.createElement('button');
+            b.textContent = 'Remove';
+            b.style.margin = '0 0 0 6px';
+            b.addEventListener('click', () => {
+              // reverse() above means index i counts back from the end
+              const idx = marked.length - 1 - i;
+              const next = marked.slice(0, idx).concat(marked.slice(idx + 1));
+              chrome.storage.local.set({ marked: next }, renderLearn);
+            });
+            row.append(b);
+            wrap.append(row);
+          });
+
         if (blocked.length) {
           wrap.append(head('Not suggested'));
           wrap.append(

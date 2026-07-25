@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en" data-lfb-surface="jobs">
+  <head>
+    <meta charset="utf-8" />
+    <title>Demo: LinkedIn Farming &amp; Scam Blocker</title>
+    <link rel="stylesheet" href="../../content.css" />
+    <style>
+      body {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 24px 16px 80px;
+        font: 14px/1.45 -apple-system, system-ui, sans-serif;
+        color: #1b1b1b;
+        background: #f4f2ee;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 18px;
+      }
+      .banner {
+        margin: 0 0 18px;
+        padding: 8px 12px;
+        font-size: 12px;
+        color: #6a4b00;
+        background: #fff4d6;
+        border-left: 3px solid #b48a18;
+        border-radius: 4px;
+      }
+      .card {
+        margin: 0 0 10px;
+        padding: 12px 14px;
+        background: #fff;
+        border: 1px solid #dcdcdc;
+        border-radius: 8px;
+      }
+      .card h3 {
+        margin: 0 0 2px;
+        font-size: 15px;
+        color: #0a66a6;
+      }
+      .meta {
+        color: #666;
+        font-size: 13px;
+      }
+      .body {
+        margin: 6px 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Demo page</h1>
+    <p class="banner">
+      Not LinkedIn. Every listing below is invented for this demo, and every company and
+      person named is fictional. The page loads the extension's real rules.js and
+      content.js, so what you see is the actual filtering output. Serve the project root and
+      open /demo/jobs/ to view it.
+    </p>
+
+    <!-- clean -->
+    <div class="card" data-job-id="1001">
+      <h3 class="job-card-list__title">Senior Backend Engineer</h3>
+      <div class="job-card-container__primary-description">Northwind Systems</div>
+      <div class="meta">Austin, TX (Hybrid) &middot; 2 days ago</div>
+      <p class="body">
+        Go and Postgres. Our process is a recruiter screen, a technical interview, then a
+        system design round. Apply through our careers site.
+      </p>
+    </div>
+
+    <!-- scam: off-platform contact -->
+    <div class="card" data-job-id="1002">
+      <h3 class="job-card-list__title">Urgent Requirement: Data Analyst</h3>
+      <div class="job-card-container__primary-description">Global Talent Partners</div>
+      <div class="meta">Remote &middot; 4 hours ago</div>
+      <p class="body">
+        Immediate joiners only. Contact on WhatsApp +1 555 0142 8899 for the JD and to
+        proceed with shortlisting today.
+      </p>
+    </div>
+
+    <!-- scam: fee -->
+    <div class="card" data-job-id="1003">
+      <h3 class="job-card-list__title">Remote Chat Support Associate</h3>
+      <div class="job-card-container__primary-description">Brightline Group</div>
+      <div class="meta">Remote &middot; 1 day ago</div>
+      <p class="body">
+        Earn $48 per hour with no experience. Pay a refundable security deposit of $150 for
+        the onboarding kit, then start the same week.
+      </p>
+    </div>
+
+    <!-- scam: no interview -->
+    <div class="card" data-job-id="1004">
+      <h3 class="job-card-list__title">Accounts Executive</h3>
+      <div class="job-card-container__primary-description">Meridian Consultancy</div>
+      <div class="meta">Remote &middot; 3 days ago</div>
+      <p class="body">
+        Direct joining, no interview needed, selection guaranteed for the first 20
+        applicants. Send your CV to meridian.hiring2024@gmail.com
+      </p>
+    </div>
+
+    <!-- weak: body shop -->
+    <div class="card" data-job-id="1005">
+      <h3 class="job-card-list__title">Java Developer</h3>
+      <div class="job-card-container__primary-description">Apex Resourcing</div>
+      <div class="meta">Dallas, TX &middot; 6 hours ago</div>
+      <p class="body">
+        Corp to corp only. Rate confirmation attached, hotlist available on request before
+        submitting your resume to my client.
+      </p>
+    </div>
+
+    <!-- clean -->
+    <div class="card" data-job-id="1006">
+      <h3 class="job-card-list__title">Staff Site Reliability Engineer</h3>
+      <div class="job-card-container__primary-description">Harbour Analytics</div>
+      <div class="meta">Remote (US) &middot; 5 days ago</div>
+      <p class="body">
+        $150 per hour contract, 10+ years required. Terraform, Kubernetes, on-call rotation
+        shared across six engineers.
+      </p>
+    </div>
+
+    <script>
+      // Minimal chrome.storage shim so the real content script runs outside an extension.
+      window.chrome = {
+        runtime: {},
+        storage: {
+          sync: { get: (defaults, cb) => cb(defaults), set: (_o, cb) => cb && cb() },
+          local: {
+            get: (defaults, cb) => cb(Object.assign({ counts: {}, marked: [] }, defaults)),
+            set: (_o, cb) => cb && cb()
+          }
+        }
+      };
+    </script>
+    <script src="../../cards.js"></script>
+    <script src="../../counters.js"></script>
+    <script src="../../rules.js"></script>
+    <script src="../../content.js"></script>
+  </body>
+</html>

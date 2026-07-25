@@ -23,6 +23,11 @@
   };
 
   function surfaceOf(path) {
+    // Test seam. demo/jobs/index.html sets this so the harness can exercise a surface
+    // without being served from a /jobs or /feed URL. Only reachable on linkedin.com,
+    // where the worst it could do is make us treat one surface as another.
+    const forced = document.documentElement.dataset.lfbSurface;
+    if (forced) return forced;
     if (path.startsWith('/jobs')) return 'jobs';
     if (path.startsWith('/messaging')) return 'messaging';
     if (path.startsWith('/feed') || path === '/') return 'feed';

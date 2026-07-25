@@ -1,108 +1,142 @@
 # LinkedIn Farming & Scam Blocker
 
-A Chrome extension that hides engagement farming and job scams on LinkedIn, and tells
-you why it hid each one.
+A Chrome extension that hides engagement farming and job scams on LinkedIn, and tells you
+why it hid each one.
 
-Nothing gets deleted. A flagged post collapses to a single line naming the rule that
-fired, with a **show** button next to it. You always know what the filter is doing, which
-means you can catch it being wrong and switch that rule off.
+Nothing is deleted. A flagged listing collapses to one line naming the rule that fired,
+with a **show** button. A floating counter tells you how many are hidden and reveals them
+all in one click. You can always see what the filter is doing, which is what lets you
+catch it being wrong.
 
-Works on job search results, the home feed, and the messaging pane.
+![Three scam listings collapsed to one-line reasons, one weak match dimmed, two clean
+listings untouched, and a "4 hidden" counter](docs/screenshot.png)
 
-> Screenshot goes here.
+*The demo page in `demo/jobs/`, running the real rules. Every listing in it is invented.*
 
 ## The problem
 
-Two different things clog up a LinkedIn job search.
+Two things clog a LinkedIn job search.
 
-The first is engagement farming. A post says it is hiring, but the link is behind
-"comment INTERESTED and I'll DM you", or a repost, or a follow. The job may not exist.
-The point of the post is the engagement.
+**Engagement farming.** The post says it is hiring, but the link is behind "comment
+INTERESTED and I'll DM you", or a repost, or a follow. The job may not exist. The
+engagement is the point.
 
-The second is outright fraud. Contact only over WhatsApp or Telegram, a registration or
-training fee, "direct joining, no interview", data entry at $55 an hour, reshipping and
-mystery shopper work, an apply link behind a URL shortener.
+**Fraud.** Contact only over WhatsApp or Telegram. A registration or training fee.
+"Direct joining, no interview." Data entry at $55 an hour. Reshipping and mystery
+shopper work. An apply link behind a URL shortener.
 
-LinkedIn's own filters do not touch either one. This extension does it locally, in your
-browser, with no account and no network calls.
-
-## What it matches
-
-Behaviour, and only behaviour.
-
-**Farming:** comment-gated links, DM gates, repost bait, follow bait, emoji walls.
-
-**Scams:** WhatsApp or Telegram contact with a real handle or number, fees and deposits,
-"no interview" and guaranteed selection, known scam genres (reshipping, mystery shopper,
-crypto payment processing), third-party URL shorteners, free-email recruiter addresses,
-one poster spamming many listings, the same listing reposted over and over.
-
-A post collapses on one scam or farming hit, or on two weak hits. A single weak signal
-only dims the post. That threshold exists because single soft signals are where the false
-positives are.
-
-There is also a negation guard. Posts warning people about these scams quote the exact
-phrases they are warning about, so "please do not comment INTERESTED on random job posts"
-stays visible.
-
-### On nationality
-
-No rule looks at nationality, country, ethnicity, name, or language.
-
-That is a design decision, and it is also the accurate one. Fraudulent listings are
-posted from everywhere, and in any country with a large recruiting industry the
-overwhelming majority of recruiters are legitimate, so country of origin is a weak
-predictor with an enormous false positive rate. The behaviour signals above are much
-sharper: a real scam has to tell you to pay, or to move to WhatsApp, or to skip the
-interview, and that is what gets matched.
-
-`test/rules.test.mjs` contains explicit negative cases asserting that ordinary listings
-from Bengaluru, Karachi, and Lahore are not flagged. If a change breaks that, the tests
-fail.
+LinkedIn filters neither. This runs locally in your browser, with no account and no
+network calls.
 
 ## Install
 
-Not on the Chrome Web Store. Load it yourself:
+Not on the Chrome Web Store, so load it yourself:
 
-1. Clone or download this repository
-2. Go to `chrome://extensions` and turn on Developer mode
-3. Click **Load unpacked** and pick the folder
+1. `git clone https://github.com/Mariano215/linkedin-farming-blocker.git`
+2. Open `chrome://extensions` and turn on **Developer mode** (top right)
+3. Click **Load unpacked** (top left) and pick the folder
 4. Open a LinkedIn job search and scroll
 
-Chrome, Edge, Brave, and any other Chromium browser. Permissions requested: `storage`,
-plus content-script access to `linkedin.com`. No host permissions for anything else, no
-background worker, no telemetry.
+Works in Chrome, Edge, Brave, and other Chromium browsers. It asks for `storage` and
+content-script access to `linkedin.com`. Nothing else: no other host permissions, no
+background worker, no telemetry, no analytics.
 
-## Tuning it
+After pulling an update, click the **reload** icon on the extension's card in
+`chrome://extensions`, then reload your LinkedIn tab. Content script changes need both.
 
-A floating button at the bottom right of LinkedIn shows how many items are hidden and
-reveals all of them in one click. If it reads "312 hidden" on a page of 25 jobs, the rules
-are wrong, not the page. That number is the fastest signal that something needs turning off.
+## What you get out of the box
 
-Open the extension's options page (`chrome://extensions`, Details, Extension options):
+Install it and it works with no configuration. Defaults:
 
-- A master on/off switch, so you never have to uninstall to escape a bad rule
-- What to do with flagged items: collapse to a reason, hide completely, or only grey out
-- A checkbox per rule, so you can switch off one that annoys you
-- Your own phrases, one per line, treated as a farming hit
-- An allowlist of companies, profile URLs, or phrases that must never be hidden
-- A hit count per rule, so an over-firing rule is obvious
-
-If something legitimate gets hidden, the stub tells you which rule did it. Uncheck it,
-reload LinkedIn, done.
-
-## How it is put together
-
-| file | role |
+| | default |
 | --- | --- |
-| `rules.js` | the rule table and matchers. No DOM, so it is testable on its own |
-| `cards.js` | card identity, content fingerprints, per-page counters |
-| `counters.js` | batched hit counters with a retry |
-| `content.js` | finds cards, applies verdicts, watches for new and recycled ones |
-| `options.html`, `options.js` | toggles, phrases, allowlist, hit counts |
+| Blocking | on |
+| Flagged listings | collapse to a one-line reason, with **show** to expand |
+| Surfaces | job search results, home feed, messaging |
+| Marking | on (hover a card, press <kbd>F</kbd>) |
+| Rules | all 15 on |
+| Blocked posters | none, you add them |
+| Your own phrases | none, you add them |
 
-No build step, no bundler, no dependencies. The files Chrome loads are the files in the
-repository.
+All 15 rules are on by default and match behaviour, never identity.
+
+**Farming, on the feed:** comment-gated links ("comment INTERESTED"), DM gates, repost
+bait, follow bait, emoji walls.
+
+**Scams, on jobs and messaging:** WhatsApp or Telegram contact with a real handle or
+number, fees and deposits, "no interview" and guaranteed selection, known scam genres
+(reshipping, mystery shopper, crypto payment processing), third-party URL shorteners,
+free-email recruiter addresses, third-party body-shop vocabulary (corp to corp, bench
+sales, rate confirmation, hotlist), low-skill roles at implausible pay, one poster
+spamming many listings, the same listing reposted repeatedly.
+
+A listing collapses on one scam or farming hit, or on two weak hits. A single weak signal
+only dims it. That threshold exists because single soft signals are where the false
+positives live.
+
+There is also a negation guard, because posts *warning* about these scams quote the exact
+phrases they warn about. "Please do not comment INTERESTED on random job posts" stays
+visible.
+
+### On nationality
+
+No rule looks at nationality, country, ethnicity, name, or language. Neither will the
+rule learner: mark ten posts that happen to share a nationality and it will refuse to
+propose that as a rule, and tell you why.
+
+This is a design decision and it is also the accurate one. Fraud is posted from
+everywhere, and in any country with a large recruiting industry the overwhelming majority
+of recruiters are legitimate, so origin is a weak predictor with a huge false positive
+rate. The behaviour signals are far sharper: a scam has to tell you to pay, or move to
+WhatsApp, or skip the interview. That is what gets matched.
+
+The `body-shop` rule is the useful version of a complaint often aimed at offshore
+recruiters. It matches the business model, `corp to corp`, `bench sales`, `rate
+confirmation`, which US-based agencies use just as much and many offshore recruiters
+never touch.
+
+If you do not want to see one specific person, block that person. See below.
+
+## Using it
+
+**The counter.** Bottom right of LinkedIn: `N hidden`. Click to reveal everything, click
+again to re-hide. It is also the diagnostic. If it reads `40 hidden` on a page of 25
+jobs, the rules are misfiring, not the page.
+
+**Marking.** Hover any card and press <kbd>F</kbd>. The card outlines, a toast confirms,
+and the text is stored locally. No button is injected into LinkedIn's markup, so nothing
+about their layout changes.
+
+**Turning marks into rules.** The options page mines your marked cards for phrases that
+recur across two or more of them and lists them with an **Add** button. Nothing becomes a
+rule until you click it. Phrases that identify people rather than describe behaviour are
+listed separately under "Not suggested", with the reason.
+
+**Blocking a poster.** Marked posters appear in options with a **Block this poster**
+button, matching on profile URL or displayed name. This is a list you build one person at
+a time and can read at any point.
+
+**Options page:** `chrome://extensions` → **Details** → **Extension options**.
+
+- Master on/off, so you never have to uninstall to escape a bad rule
+- What flagged items do: collapse to a reason, hide completely, or only grey out
+- A checkbox per rule
+- Your own phrases, one per line
+- An allowlist of companies, profile URLs, or phrases that must never be hidden
+- Hit counts per rule, so an over-firing rule is obvious
+
+If something legitimate gets hidden, the stub names the rule. Uncheck it, reload, done.
+
+## Try it without LinkedIn
+
+```
+python3 -m http.server 8000
+```
+
+Open `http://localhost:8000/demo/jobs/`. Six invented listings, filtered by the real
+`rules.js` and `content.js` with a small `chrome.storage` shim. Useful for seeing the
+behaviour before installing, and for checking a rule change end to end without scrolling
+a real feed.
 
 ## Tests
 
@@ -110,9 +144,18 @@ repository.
 node --test test/*.mjs
 ```
 
-22 tests, no framework, no dependencies. `rules.js`, `cards.js`, and `counters.js` all
-set a global and also export for CommonJS, which is how the same file runs in a content
-script and under node.
+31 tests, no framework, no dependencies, no build step.
+
+| file | role |
+| --- | --- |
+| `rules.js` | rule table and matchers. No DOM, so it tests standalone |
+| `cards.js` | card identity, content fingerprints, per-page counters |
+| `counters.js` | batched hit counters with retry |
+| `learn.js` | mines marked cards for candidate phrases, and the identity guard |
+| `content.js` | finds cards, applies verdicts, watches for new and recycled ones |
+| `options.html`, `options.js` | all settings and the learner UI |
+
+The files Chrome loads are the files in the repository.
 
 ## Adding a rule
 
@@ -128,23 +171,26 @@ One entry in the `rules` array in `rules.js`:
 }
 ```
 
-Then one test case in `test/rules.test.mjs`, and one negative case proving what it must
-not match. The negative case is the important half. It is easy to write a rule that
-catches every scam and half the real jobs too.
+Then a test in `test/rules.test.mjs`, **and a negative case proving what it must not
+match.** The negative case is the important half. Writing a rule that catches every scam
+and half the real jobs with it is easy, and it has happened in this repo more than once.
 
-Matchers get a plain object, never a DOM node, so a test is one string in and one
+Matchers receive a plain object, never a DOM node, so a test is one string in and one
 assertion out.
 
 ## Known limits
 
 LinkedIn rotates DOM class names and A/B tests card markup, so the selectors in
-`content.js` will rot eventually. Matching is text and `data-*`-attribute based to slow
-that down, and every stub states its reason so a broken rule is visible rather than
-silent. If the hit table stops moving, the selectors need a look.
+`content.js` will rot. Matching is text and `data-*`-attribute based to slow that down,
+and every stub states its reason so a broken rule is visible rather than silent. If the
+hit counts stop moving, the selectors need a look.
 
-Cross-card rules (one poster spamming, the same listing repeated) count as you scroll, so
-a farm poster is caught from the card that crosses the threshold onward, not
-retroactively.
+Cross-card rules (one poster spamming, a listing repeated) count as you scroll, so a farm
+poster is caught from the card that crosses the threshold onward, not retroactively.
+
+Scanning is one document-wide pass on a 300ms trailing timer, and it backs off to as much
+as 5 seconds if a pass ever exceeds 50ms, logging `[lfb] scan took Nms`. If you see that
+warning, the selectors are matching far more than intended.
 
 Hit counts are a tuning aid, not an audit log. Two tabs flushing at the same instant can
 lose a delta.
